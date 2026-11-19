@@ -66452,10 +66452,10 @@ function irisGeometry(rx,ry) {
   }
   return geo;
 }
-const chrome = material(0xbdb6df,.26,.55);
-const darkMetal = material(0x373050,.29,.49);
-const pearl = material(0xe9e1ff,.24,.23);
-const orchid = material(0x9a57ee,.23,.39);
+const chrome = material(0xf1f1f1,.065,1);
+const darkMetal = material(0xd7d7d7,.10,1);
+const pearl = material(0xf3f3f3,.075,1);
+const orchid = material(0xececec,.055,1);
 function lathe(parent,mat,points) {
   return mesh(parent,new T.LatheGeometry(points.map(p=>new T.Vector2(...p)),80),mat,0,0,0);
 }
@@ -66985,6 +66985,21 @@ const environment = texture(512,256,(ctx,w,h)=>{
 environment.mapping=T.EquirectangularReflectionMapping;
 scene.environment=environment;
 scene.environmentIntensity=.58;
+// Contrasting light bands reveal the curvature of polished chrome.
+const chromeSky=texture(1024,512,(ctx,w,h)=>{
+  const sky=ctx.createLinearGradient(0,0,0,h);
+  for(const [height,color] of [[0,'#dce4ef'],[.26,'#8993a0'],[.43,'#f9fcff'],
+    [.49,'#c6ced8'],[.51,'#151922'],[.62,'#353b45'],[.78,'#9ea6af'],[1,'#32363d']]){
+    sky.addColorStop(height,color);
+  }
+  ctx.fillStyle=sky;
+  ctx.fillRect(0,0,w,h);
+});
+chromeSky.mapping=T.EquirectangularReflectionMapping;
+for(const finish of [chrome,darkMetal,pearl,orchid]){
+  finish.envMap=chromeSky;
+  finish.envMapIntensity=1.0;
+}
 scene.add(new T.HemisphereLight(0xd9e6ff,0x8e79ac,.96));
 
 const sunDirection=new T.Vector3(-.30,.30,-1).normalize();
@@ -67556,12 +67571,15 @@ function flexWhiskers(dt,t){
     positions.needsUpdate=true;
   }
 }
+const boostRed=new T.Color(0xff1010);
+let boostFade=0;
 renderer.setAnimationLoop((ms,frame)=>{
   const t=ms*.001;
   const dt=lastMs===null?1/60:T.MathUtils.clamp((ms-lastMs)*.001,0,.05);
   lastMs=ms;
   let pitch=-.09+Math.sin(t*.8)*.042, yaw=desktopYaw, roll=Math.sin(t*.6)*.065;
   let x,z, tracking, viewer, inputs=[];
+  let boosting=false;
   if(frame && renderer.xr.isPresenting){
     tracking=renderer.xr.getReferenceSpace();
     const pose=tracking && frame.getViewerPose(tracking);
@@ -67589,7 +67607,8 @@ renderer.setAnimationLoop((ms,frame)=>{
         rig.position.add(rotatedHead);
       }
       const [strafe,walk]=stick(inputs.find(input=>input.handedness==='left')?.gamepad);
-      fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,inputs.find(i=>i.handedness==='right')?.gamepad?.buttons[4]?.pressed,dt);
+      boosting=inputs.find(i=>i.handedness==='right')?.gamepad?.buttons[4]?.pressed;
+      fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,boosting,dt);
       rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
       nextViewer.set(rotatedHead.x,position.y+rig.position.y,rotatedHead.z);
       const before=displacement.copy(nextViewer);
@@ -67613,7 +67632,8 @@ renderer.setAnimationLoop((ms,frame)=>{
     const dx=pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft');
     const dz=pressed('KeyS','ArrowDown')-pressed('KeyW','ArrowUp');
     previousViewer.copy(desktopPosition);
-    fly(desktopPosition,dx,Number(moveKeys.has('KeyE'))-Number(moveKeys.has('KeyQ')),dz,desktopYaw,moveKeys.has('Space'),dt);
+    boosting=moveKeys.has('Space');
+    fly(desktopPosition,dx,Number(moveKeys.has('KeyE'))-Number(moveKeys.has('KeyQ')),dz,desktopYaw,boosting,dt);
     stopAtMirror(previousViewer,desktopPosition);
     desktopCamera();
     x=desktopPosition.x;z=desktopPosition.z;
@@ -67665,9 +67685,13 @@ renderer.setAnimationLoop((ms,frame)=>{
   mint.color.setHSL(lightHue,.83,.29);
   mint.emissive.setHSL(lightHue,.94,.32);
   mint.emissiveIntensity=.76+.74*pulse+1.35*mouthAmount;
+  boostFade=T.MathUtils.clamp(boostFade+dt*(boosting?1/.85:-1/1.1),0,1);
+  const redMix=T.MathUtils.smoothstep(boostFade,0,1);
+  mint.color.lerp(boostRed,redMix);
+  mint.emissive.lerp(boostRed,redMix);
   rimLights.forEach(({lens,glow},i)=>{
     const hue=(lightHue+i*.048)%1;
-    lens.color.setHSL(hue,.88,.31+.12*pulse+.15*mouthAmount);
+    lens.color.setHSL(hue,.88,.31+.12*pulse+.15*mouthAmount).lerp(boostRed,redMix);
     glow.color.copy(lens.color);
     glow.opacity=.38+.28*pulse+.34*mouthAmount;
   });
