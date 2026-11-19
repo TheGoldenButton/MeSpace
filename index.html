@@ -66291,8 +66291,15 @@ function fur(kind) {
       ctx.fill();
     }
     if(kind==='head'){
+      // Leave the bridge between the eyes purple while keeping the outer stripes.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0,0,182,h);
+      ctx.rect(330,0,w-330,h);
+      ctx.clip();
       backStripe(195,221,33,29);
       backStripe(256,239,34,32);
+      ctx.restore();
       backStripe(317,226,29,29);
       for(const x of [218,256,294]){
         ctx.beginPath();ctx.moveTo(x-14,40);
