@@ -66472,8 +66472,40 @@ const cat = new T.Group();
 cat.name='Conscious Kitty';
 cat.position.y=.30;
 ufo.add(cat);
-oval(cat,bodyFur,0,.29,-.07,.283,.341,.255);
-oval(cat,lavender,0,.328,-.278,.157,.232,.059);
+const trunk=[
+  oval(cat,bodyFur,0,.29,-.07,.283,.341,.255),
+  oval(cat,lavender,0,.328,-.278,.157,.232,.059)
+];
+// Bend from the seated pelvis through the ribs. Both fur surfaces use
+// identical weights at the same height so the belly marking stays attached.
+function spineWeight(y){
+  return T.MathUtils.clamp((y-.09)/.50,0,1);
+}
+for(const part of trunk){
+  const geo=part.geometry=part.geometry.clone();
+  const pos=geo.attributes.position;
+  geo.morphTargetsRelative=true;
+  geo.morphAttributes.position=[];
+  geo.morphAttributes.normal=[];
+  for(const axis of ['x','y','z']){
+    for(const upper of [false,true]){
+      const offsets=new Float32Array(pos.count*3);
+      const normals=new Float32Array(pos.count*3);
+      const component={x:0,y:1,z:2}[axis];
+      for(let i=0;i<pos.count;i++){
+        const y=part.position.y+pos.getY(i)*part.scale.y;
+        const w=spineWeight(y);
+        const weight=upper?w*w:w*(1-w);
+        offsets[i*3+component]=weight/part.scale[axis];
+        const slope=y>.09 && y<.59?(upper?2*w:1-2*w)/.50:0;
+        normals[i*3+1]=-geo.attributes.normal.array[i*3+component]*slope*part.scale.y/part.scale[axis];
+      }
+      geo.morphAttributes.position.push(new T.BufferAttribute(offsets,3));
+      geo.morphAttributes.normal.push(new T.BufferAttribute(normals,3));
+    }
+  }
+  part.updateMorphTargets();
+}
 const paws = [];
 for(const s of [-1,1]){
   const thigh=oval(cat,legFur,s*.202,.139,-.003,.153,.166,.195);
@@ -66627,7 +66659,12 @@ const jaw=new T.Group();
 jaw.name='Jaw hinge';
 jaw.position.set(0,-.039,-0.17668);
 head.add(jaw);
-oval(jaw,lavender,0,-.034,-.110,.092,.043,.079);
+// The mandible extends behind the pivot into the cheeks.
+oval(jaw,lavender,0,-.023,-.067,.095,.048,.122);
+for(const side of [-1,1]){
+  const cheek=oval(jaw,faceFur,side*.064,.006,-.046,.041,.055,.098);
+  cheek.rotation.x=-.20;
+}
 const tongue=oval(jaw,material(0xed8099,.53),0,.002,-.149,.049,.010,.045);
 let tongueLift=0;
 tongue.name='Tongue';
@@ -66717,11 +66754,14 @@ function speak(dt){
   const goal=heldOpen>0?Math.max(drive,mouthAmount*.78):drive;
   mouthAmount+=(goal-mouthAmount)*(1-Math.exp(-(goal>mouthAmount?23:12)*dt));
   spread+=(width-spread)*(1-Math.exp(-13*dt));
-  jaw.rotation.x=-mouthAmount*.54;
-  jaw.position.z=-.17668-mouthAmount*.013;
+  jaw.rotation.x=-mouthAmount*.48;
   jaw.scale.x=1+spread*.13;
-  mouth.position.y=-.032-mouthAmount*.047;
-  mouth.scale.y=.007+mouthAmount*.054;
+  // Keep the upper edge under the muzzle and the lower edge on the jaw.
+  const gape=-Math.sin(jaw.rotation.x)*.15;
+  mouth.position.y=-.032-gape*.5;
+  mouth.scale.y=.009+gape*.52;
+  mouth.scale.z=.045;
+  mouth.position.z=-.31+.15*(1-Math.cos(jaw.rotation.x))*.5;
   mouth.scale.x=.068+spread*.028-mouthAmount*.005;
   upperMuzzle.position.set(0,.012*mouthAmount,-.004*mouthAmount);
   lipLine.scale.x=1+.17*spread;
@@ -66878,6 +66918,7 @@ const liveJets=craft.children[craft.children.length-1];
 // The real hull and reflected hull share geometry but use different stencil state.
 const reflected=new T.Group();reflected.position.z=2*mirrorZ;reflected.scale.z=-1;
 scene.add(reflected);reflected.add(avatar);
+const animatedLights=[mint,...rimLights.flatMap(({lens,glow})=>[lens,glow])];
 const mirrorMaterials=new Map();
 avatar.traverse(part=>{
   if(!part.material)return;
@@ -66907,9 +66948,18 @@ function unlockEngine(){
 }
 window.addEventListener('pointerdown',unlockEngine);
 const velocity=new T.Vector3();
+const flightLoad=new T.Vector3();
+const seatedLean=new T.Vector3(), ribLoad=new T.Vector3(), neckLoad=new T.Vector3();
+const lumbarOffset=new T.Vector3(), ribOffset=new T.Vector3();
+function followSpine(point){
+  const w=spineWeight(point.y);
+  return point.addScaledVector(lumbarOffset,w*(1-w)).addScaledVector(ribOffset,w*w);
+}
+const localLoad=new T.Vector3();
 function fly(position,x,y,z,heading,boost,dt){
   const target=step(x,z,heading,1);target.y=y;
   target.clampLength(0,1).multiplyScalar(boost?6:2.25);
+  flightLoad.subVectors(velocity,target).multiplyScalar(.095).clampLength(0,.26);
   velocity.lerp(target,1-Math.exp(-5*dt));
   position.addScaledVector(velocity,dt);
 }
@@ -67042,12 +67092,13 @@ function clearChest(point,side,limit){
   point.x+=side*.6*correction;
   point.z-=.8*correction;
 }
-function posePaws(frame, reference, inputs, viewer, dt){
-  catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).invert();
+function posePaws(frame, reference, inputs, viewer, dt,t){
+  catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
   const blend=1-Math.exp(-23*dt);
   for(const limb of paws){
     const side=Math.sign(limb.shoulder.x);
-    const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):limb.shoulder;
+    const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):vrShoulder.copy(limb.shoulder);
+    followSpine(shoulder);
     const input=inputs.find(source=>source.handedness===limb.hand);
     let tracked=null;
     if(frame && reference && input){
@@ -67070,6 +67121,17 @@ function posePaws(frame, reference, inputs, viewer, dt){
       handTarget.y=Math.max(.07,handTarget.y);
       wrist.set(orientation.x,orientation.y,orientation.z,orientation.w)
         .premultiply(poseQ.setFromAxisAngle(up,rig.rotation.y)).premultiply(catInverse);
+    }
+    if(!limb.tracked){
+      const phase=t*(side<0?.86:.72)+side*1.8;
+      const lift=Math.pow(.5+.5*Math.sin(phase+.45*Math.sin(t*.37)),4);
+      handTarget.y+=.055*lift+.006*Math.sin(t*1.68+side*.3);
+      handTarget.z-=.031*lift;
+      const brace=T.MathUtils.clamp(2.6*(side*seatedLean.x+Math.abs(seatedLean.z)*.45),0,1);
+      handTarget.x+=side*(.023*lift+.046*brace);
+      handTarget.y-=brace*(.012+.04*lift);
+      handTarget.z-=.036*brace;
+      wrist.setFromAxisAngle(up,side*.18*lift);
     }
     limb.paw.position.lerp(handTarget,blend);
     if(frame)clearChest(limb.paw.position,side,.45);
@@ -67189,25 +67251,47 @@ renderer.setAnimationLoop((ms,frame)=>{
   const neckYaw=T.MathUtils.clamp(delta,-1.05,1.05)*Math.exp(-2.3*dt);
   avatar.rotation.y=yaw-neckYaw;
   ufo.rotation.set(Math.sin(t*1.4)*.015,0,Math.cos(t*1.18)*.021);
-  head.rotation.set(pitch,neckYaw,roll,'YXZ');
-  leanLocal.copy(leanWorld).applyQuaternion(catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).invert());
-  head.position.set(0,.584,-.096).add(leanLocal);
+  localLoad.copy(flightLoad).applyAxisAngle(up,-avatar.rotation.y);
+  seatedLean.lerp(localLoad,1-Math.exp(-8*dt));
+  const breath=Math.sin(t*1.68+.22*Math.sin(t*.4));
+  const shift=Math.sin(t*.68+.65*Math.sin(t*.29));
+  ribLoad.lerp(seatedLean,1-Math.exp(-13*dt));
+  neckLoad.lerp(ribLoad,1-Math.exp(-9*dt));
+  lumbarOffset.set(seatedLean.x*.32+.013*shift,seatedLean.y*.12,seatedLean.z*.30);
+  ribOffset.set(ribLoad.x*.36+.014*shift,ribLoad.y*.19+.007*breath-.07*Math.hypot(ribLoad.x,ribLoad.z),ribLoad.z*.39+.005*breath);
+  for(const part of trunk){
+    const weights=part.morphTargetInfluences;
+    weights[0]=lumbarOffset.x; weights[1]=ribOffset.x;
+    weights[2]=lumbarOffset.y; weights[3]=ribOffset.y;
+    weights[4]=lumbarOffset.z; weights[5]=ribOffset.z;
+  }
+  head.rotation.set(pitch+.30*(neckLoad.z-ribLoad.z),neckYaw,roll-.32*(neckLoad.x-ribLoad.x),'YXZ');
+  leanLocal.copy(leanWorld).applyQuaternion(catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert());
+  followSpine(head.position.set(0,.584,-.096)).add(leanLocal)
+    .addScaledVector(neckLoad,.18).addScaledVector(ribLoad,-.18);
   if(viewer){
     // Express the tracked world orientation in the animated neck parent’s frame.
-    head.quaternion.copy(avatar.quaternion).multiply(ufo.quaternion).invert()
+    head.quaternion.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert()
       .multiply(poseQ.setFromAxisAngle(up,rig.rotation.y))
       .multiply(poseQ.setFromEuler(view));
   }
   irisMaps[0].rotation=t*.53;
   irisMaps[1].rotation=t*.41+.48;
   animateTail(t);
-  posePaws(frame,tracking,inputs,viewer,dt);
+  posePaws(frame,tracking,inputs,viewer,dt,t);
   speak(dt);
   twitchEars(t);
   flexWhiskers(dt);
-  mint.emissiveIntensity=1.48+Math.sin(t*3.5)*.27;
-  rimLights.forEach(({glow},i)=>{
-    glow.opacity=.65+.24*Math.sin(t*2.1-i*2*Math.PI/3);
+  const pulse=.5-.5*Math.cos(t*2*Math.PI/5);
+  const lightHue=(.43+t/32+.28*mouthAmount+.04*spread)%1;
+  mint.color.setHSL(lightHue,.83,.29);
+  mint.emissive.setHSL(lightHue,.94,.32);
+  mint.emissiveIntensity=.76+.74*pulse+1.35*mouthAmount;
+  rimLights.forEach(({lens,glow},i)=>{
+    const hue=(lightHue+i*.048)%1;
+    lens.color.setHSL(hue,.88,.31+.12*pulse+.15*mouthAmount);
+    glow.color.copy(lens.color);
+    glow.opacity=.38+.28*pulse+.34*mouthAmount;
   });
   const thrust=Math.min(1,velocity.length()/6);
   craft.position.copy(avatar.position);
@@ -67236,15 +67320,20 @@ renderer.setAnimationLoop((ms,frame)=>{
     beam.material.color.copy(live.material.color);
     beam.material.opacity=live.material.opacity;
   });
-  for(const source of [mint,...rimLights.map(light=>light.glow)]){
+  for(const source of animatedLights){
     const copy=mirrorMaterials.get(source);
-    copy.opacity=source.opacity;copy.emissiveIntensity=source.emissiveIntensity;
+    copy.color.copy(source.color);
+    copy.opacity=source.opacity;
+    if(source.emissive){
+      copy.emissive.copy(source.emissive);
+      copy.emissiveIntensity=source.emissiveIntensity;
+    }
   }
   if(engine && gain){
     const now=engine.currentTime;
     const base=49+102*thrust+12*ahead+23*climb;
     const flutter=Math.sin(t*(15+18*Math.max(0,-ahead)+8*thrust));
-    gain.gain.setTargetAtTime(.067*thrust*(1+.14*flutter),now,.055);
+    gain.gain.setTargetAtTime(.077*thrust*(1+.14*flutter),now,.055);
     osc.frequency.setTargetAtTime(base+3*thrust*flutter,now,.055);
     harmonic.frequency.setTargetAtTime(base*(1.8+.36*ahead+.49*climb+.22*Math.abs(lateral)),now,.06);
     overtone.gain.setTargetAtTime(.18+.28*Math.abs(lateral)+.18*Math.max(0,climb),now,.06);
