@@ -66544,6 +66544,7 @@ const tailTangent=new T.Vector3(), tailSide=new T.Vector3(), tailNormal=new T.Ve
 const tailUp=new T.Vector3(0,1,0);
 function animateTail(t){
   const swing=1.09*Math.sin(.76*t+.48*Math.sin(.31*t));
+  const curl=T.MathUtils.smoothstep(Math.abs(swing),.47,1.04);
   // Lay the fixed base along the back of the pelvis. The mobile rings start
   // beyond the rump and rise only after the tail clears the torso.
   for(let row=0;row<=48;row++){
@@ -66553,6 +66554,12 @@ function animateTail(t){
       .055*(1-u)+flex*.50*Math.sin(angle),
       .216+.44*u*u+flex*.073*Math.sin(1.29*t-3*u),
       .151+.51*(1-Math.pow(1-u,3))+flex*.081*Math.cos(angle));
+    // Clear the hips before curling forward alongside the cheek.
+    const outside=T.MathUtils.smoothstep(u,.12,.59);
+    const reach=T.MathUtils.smoothstep(u,.53,1);
+    const center=tailCenters[row];
+    center.x=T.MathUtils.lerp(center.x,.055*(1-u)+Math.sign(swing)*outside*(.65-.045*reach),curl);
+    center.z-=curl*.98*reach;
   }
   for(let row=0;row<=48;row++){
     const center=tailCenters[row],radius=.034+.034*(1-row/48);
@@ -66956,17 +66963,22 @@ function followSpine(point){
   return point.addScaledVector(lumbarOffset,w*(1-w)).addScaledVector(ribOffset,w*w);
 }
 const localLoad=new T.Vector3();
+let boostSpeed=0, braceAmount=0, braceClock=0;
 function fly(position,x,y,z,heading,boost,dt){
   const target=step(x,z,heading,1);target.y=y;
   target.clampLength(0,1).multiplyScalar(boost?6:2.25);
-  flightLoad.subVectors(velocity,target).multiplyScalar(.095).clampLength(0,.26);
+  boostSpeed=T.MathUtils.smoothstep(velocity.length(),2.25,6);
+  flightLoad.subVectors(velocity,target).multiplyScalar(.095).clampLength(0,.26+.10*boostSpeed);
+  braceClock+=dt*(1.6+.35*Math.sin(braceClock*.63));
+  const braceTarget=boostSpeed*T.MathUtils.smoothstep(Math.sin(braceClock),.18,.91);
+  braceAmount+=(braceTarget-braceAmount)*(1-Math.exp(-7*dt));
   velocity.lerp(target,1-Math.exp(-5*dt));
   position.addScaledVector(velocity,dt);
 }
 let drag=null, desktopYaw=0, desktopPitch=Math.atan2(-.21,1.09-mirrorZ);
 const desktopPosition=new T.Vector3(0,1.38,1.09);
 const moveKeys=new Set();
-const walkingKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','ShiftLeft','ShiftRight']);
+const walkingKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','Space']);
 window.addEventListener('keydown',e=>{
   if(!walkingKeys.has(e.code) || e.altKey || e.ctrlKey || e.metaKey)return;
   e.preventDefault();
@@ -67005,7 +67017,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
-const previewHelp='Scroll to adjust field of view';
+const previewHelp='Hold Space while moving to boost · Scroll to adjust field of view';
 let xrReady=false, anchored=false, avatarHeight=1.66, startYaw=0;
 async function detectXR(){
   if(!isSecureContext || location.protocol==='file:'){
@@ -67015,7 +67027,7 @@ async function detectXR(){
   try{xrReady=!!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr'));}
   catch{xrReady=false;}
   button.disabled=!xrReady;
-  status.textContent=xrReady?'Select Enter VR in your headset.':previewHelp+' · VR requires a WebXR headset browser.';
+  status.textContent=xrReady?'Select Enter VR in your headset. Hold right A while flying to boost.':previewHelp+' · VR requires a WebXR headset browser.';
 }
 button.addEventListener('click',async()=>{
   button.disabled=true;
@@ -67039,7 +67051,7 @@ button.addEventListener('click',async()=>{
       velocity.set(0,0,0);desktopCamera();
       panel.hidden=false;
       button.disabled=!xrReady;
-      status.textContent='Select Enter VR in your headset.';
+      status.textContent='Select Enter VR in your headset. Hold right A while flying to boost.';
     },{once:true});
     renderer.xr.setFramebufferScaleFactor(.91);
     await renderer.xr.setSession(session);
@@ -67127,7 +67139,7 @@ function posePaws(frame, reference, inputs, viewer, dt,t){
       const lift=Math.pow(.5+.5*Math.sin(phase+.45*Math.sin(t*.37)),4);
       handTarget.y+=.055*lift+.006*Math.sin(t*1.68+side*.3);
       handTarget.z-=.031*lift;
-      const brace=T.MathUtils.clamp(2.6*(side*seatedLean.x+Math.abs(seatedLean.z)*.45),0,1);
+      const brace=T.MathUtils.clamp(braceAmount+2.6*(side*seatedLean.x+Math.abs(seatedLean.z)*.45),0,1);
       handTarget.x+=side*(.023*lift+.046*brace);
       handTarget.y-=brace*(.012+.04*lift);
       handTarget.z-=.036*brace;
@@ -67222,7 +67234,7 @@ renderer.setAnimationLoop((ms,frame)=>{
         rig.position.add(rotatedHead);
       }
       const [strafe,walk]=stick(inputs.find(input=>input.handedness==='left')?.gamepad);
-      fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,inputs.some(i=>i.gamepad?.buttons[0]?.pressed),dt);
+      fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,inputs.find(i=>i.handedness==='right')?.gamepad?.buttons[4]?.pressed,dt);
       rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
       x=rotatedHead.x;z=rotatedHead.z;
       torsoTracker.lerp(leanWorld.set(position.x,position.y,position.z),1-Math.exp(-2.2*dt));
@@ -67238,7 +67250,7 @@ renderer.setAnimationLoop((ms,frame)=>{
     const pressed=(a,b)=>Number(moveKeys.has(a)||moveKeys.has(b));
     const dx=pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft');
     const dz=pressed('KeyS','ArrowDown')-pressed('KeyW','ArrowUp');
-    fly(desktopPosition,dx,Number(moveKeys.has('KeyE'))-Number(moveKeys.has('KeyQ')),dz,desktopYaw,pressed('ShiftLeft','ShiftRight'),dt);
+    fly(desktopPosition,dx,Number(moveKeys.has('KeyE'))-Number(moveKeys.has('KeyQ')),dz,desktopYaw,moveKeys.has('Space'),dt);
     desktopCamera();
     x=desktopPosition.x;z=desktopPosition.z;
     avatarHeight=desktopPosition.y;
@@ -67252,13 +67264,13 @@ renderer.setAnimationLoop((ms,frame)=>{
   avatar.rotation.y=yaw-neckYaw;
   ufo.rotation.set(Math.sin(t*1.4)*.015,0,Math.cos(t*1.18)*.021);
   localLoad.copy(flightLoad).applyAxisAngle(up,-avatar.rotation.y);
-  seatedLean.lerp(localLoad,1-Math.exp(-8*dt));
+  seatedLean.lerp(localLoad,1-Math.exp(-(8+5*boostSpeed)*dt));
   const breath=Math.sin(t*1.68+.22*Math.sin(t*.4));
   const shift=Math.sin(t*.68+.65*Math.sin(t*.29));
   ribLoad.lerp(seatedLean,1-Math.exp(-13*dt));
   neckLoad.lerp(ribLoad,1-Math.exp(-9*dt));
   lumbarOffset.set(seatedLean.x*.32+.013*shift,seatedLean.y*.12,seatedLean.z*.30);
-  ribOffset.set(ribLoad.x*.36+.014*shift,ribLoad.y*.19+.007*breath-.07*Math.hypot(ribLoad.x,ribLoad.z),ribLoad.z*.39+.005*breath);
+  ribOffset.set(ribLoad.x*.36+.014*shift,ribLoad.y*.19-.051*braceAmount+.007*breath-.07*Math.hypot(ribLoad.x,ribLoad.z),ribLoad.z*.39+.005*breath);
   for(const part of trunk){
     const weights=part.morphTargetInfluences;
     weights[0]=lumbarOffset.x; weights[1]=ribOffset.x;
@@ -67331,12 +67343,12 @@ renderer.setAnimationLoop((ms,frame)=>{
   }
   if(engine && gain){
     const now=engine.currentTime;
-    const base=49+102*thrust+12*ahead+23*climb;
+    const base=49+102*thrust+19*boostSpeed+12*ahead+23*climb;
     const flutter=Math.sin(t*(15+18*Math.max(0,-ahead)+8*thrust));
     gain.gain.setTargetAtTime(.077*thrust*(1+.14*flutter),now,.055);
     osc.frequency.setTargetAtTime(base+3*thrust*flutter,now,.055);
     harmonic.frequency.setTargetAtTime(base*(1.8+.36*ahead+.49*climb+.22*Math.abs(lateral)),now,.06);
-    overtone.gain.setTargetAtTime(.18+.28*Math.abs(lateral)+.18*Math.max(0,climb),now,.06);
+    overtone.gain.setTargetAtTime(.18+.15*boostSpeed+.28*Math.abs(lateral)+.18*Math.max(0,climb),now,.06);
     pan.pan.setTargetAtTime(.74*lateral,now,.07);
   }
   try { renderer.render(scene,camera); }
