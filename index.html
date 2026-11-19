@@ -66266,7 +66266,7 @@ function rng(seed) {
   return ()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 }
 function fur(kind) {
-  return texture(1024,512,(ctx,w,h)=>{
+  const map=texture(1024,512,(ctx,w,h)=>{
     const base=ctx.createLinearGradient(0,0,0,h);
     base.addColorStop(0,'#a751e7');base.addColorStop(.47,'#8035c4');base.addColorStop(1,'#6026a2');
     ctx.fillStyle=base;ctx.fillRect(0,0,w,h);
@@ -66277,18 +66277,33 @@ function fur(kind) {
       ctx.bezierCurveTo(x+dx*.63,y+dy+width*.28,x+dx*.2,y+width*.69,x,y+width*.49);
       ctx.closePath();ctx.fill();
     }
+    // The rear centerline of SphereGeometry falls at u=.25.
+    function backStripe(y,span,drop,width) {
+      const x=w*.25;
+      ctx.fillStyle='#67ce54';
+      ctx.beginPath();
+      ctx.moveTo(x-span,y+drop);
+      ctx.bezierCurveTo(x-span*.72,y+drop*.62,x-span*.28,y-width*.5,x,y-width*.5);
+      ctx.bezierCurveTo(x+span*.28,y-width*.5,x+span*.72,y+drop*.62,x+span,y+drop);
+      ctx.bezierCurveTo(x+span*.64,y+drop*1.05,x+span*.32,y+width*.5,x,y+width*.5);
+      ctx.bezierCurveTo(x-span*.32,y+width*.5,x-span*.64,y+drop*1.05,x-span,y+drop);
+      ctx.closePath();
+      ctx.fill();
+    }
     if(kind==='head'){
-      for(const y of [220,280,335]){
-        stripe(8,y,203,-32,29);
-        stripe(518,y,-211,-38,29);
-      }
+      backStripe(195,221,33,29);
+      backStripe(256,239,34,32);
+      backStripe(317,226,29,29);
       for(const x of [218,256,294]){
         ctx.beginPath();ctx.moveTo(x-14,40);
         ctx.quadraticCurveTo(x-8,116,x+(256-x)*.5,151+22*(x===256));
         ctx.quadraticCurveTo(x+16,106,x+14,40);
         ctx.closePath();ctx.fill();
       }
-      for(const y of [180,270,360]) stripe(630,y,290,36,45);
+      for(const y of [180,270,360]){
+        stripe(630,y,92,24,40);
+        stripe(906,y,-92,24,40);
+      }
     }else if(kind==='leg'){
       for(const y of [192,324]){
         ctx.fillStyle='#67ce54';
@@ -66305,11 +66320,12 @@ function fur(kind) {
         ctx.fill();
       }
     }else{
-      for(const y of [102,180,253,325,407]){
-        stripe(0,y,213,43,40);
-        stripe(525,y,-221,41,40);
+      const rows=[102,180,253,325,407];
+      const spans=[189,226,246,235,192];
+      rows.forEach((y,i)=>{
+        backStripe(y+15,spans[i],37,38);
         stripe(570,y,400,21,48);
-      }
+      });
     }
     const rand=rng(kind==='head'?12:41);
     for(let i=0;i<65000;i++){
@@ -66323,6 +66339,8 @@ function fur(kind) {
       ctx.stroke();
     }
   });
+  map.wrapS=T.RepeatWrapping;
+  return map;
 }
 const coatNormal=texture(768,384,(ctx,w,h)=>{
   ctx.fillStyle='#444';ctx.fillRect(0,0,w,h);
@@ -66359,13 +66377,13 @@ function coat(color,roughness,map){
 const faceFur=coat(0xffffff,.79,fur('head'));
 const bodyFur=coat(0xffffff,.83,fur('body'));
 const legFur=coat(0xffffff,.83,fur('leg'));
-legFur.map.wrapS=T.RepeatWrapping;
 const purple = coat(0x8834c7,.81,null);
 const green = material(0x75d95a,.65);
 const lavender = coat(0xd496ef,.87,null);
 lavender.normalScale.set(.20,.20);
 const deep = material(0x2a103f,.62);
 const innerEar = material(0xf18dd6,.66);
+const earCupMaterial = material(0xffffff,.72,0,{vertexColors:true});
 const noseMat = material(0x87427e,.28,0,{emissive:0x280921,emissiveIntensity:.2});
 const white = new T.MeshBasicMaterial({color:0xfff5ff});
 const mint = material(0x75ffc4,.23,.12,{emissive:0x45ffab,emissiveIntensity:1.8});
@@ -66414,7 +66432,7 @@ function irisGeometry(rx,ry) {
   const p=geo.attributes.position;
   for(let i=0;i<p.count;i++) {
     const x=p.getX(i),y=p.getY(i);
-    p.setXYZ(i,x*rx,y*ry,.04*(1-x*x-y*y));
+    p.setXYZ(i,x*rx,y*ry,.024*(1-x*x-y*y));
   }
   return geo;
 }
@@ -66558,19 +66576,71 @@ function animateTail(t){
 
 const head = new T.Group();head.name='Head';head.position.set(0,.584,-.096);cat.add(head);
 oval(head,faceFur,0,.132,0,.366,.324,.297);
-function ear(parent,mat,s,inner) {
+function ear(parent,side) {
   const shape=new T.Shape();
-  shape.moveTo(-.124,-.025);
-  shape.bezierCurveTo(-.142,.082,-.124,.227,-.079,.337);
-  shape.bezierCurveTo(-.058,.392,-.028,.366,.003,.329);
-  shape.bezierCurveTo(.079,.243,.126,.115,.133,.025);
-  shape.bezierCurveTo(.127,-.041,-.033,-.064,-.124,-.025);
-  const geo=new T.ExtrudeGeometry(shape,{depth:inner?.014:.062,bevelEnabled:true,bevelSize:inner?.016:.038,bevelThickness:inner?.016:.038,bevelSegments:3,steps:1,curveSegments:12});
-  const e=mesh(parent,geo,mat,s*(inner?.008:0),inner?.034:0,inner?-.046:0);
-  e.scale.set(s*(inner?.67:1),inner?.66:1,1);
-  e.rotation.z=s*.32;
+  shape.moveTo(-.170,-.071);
+  shape.bezierCurveTo(-.157,.028,-.007,.210,.065,.284);
+  shape.quadraticCurveTo(.077,.297,.084,.279);
+  shape.bezierCurveTo(.116,.198,.151,.050,.151,-.044);
+  shape.bezierCurveTo(.116,-.105,-.088,-.116,-.170,-.071);
+  const rimZ=-.014;
+  const curveSegments=16;
+  const shellGeo=new T.ExtrudeGeometry(shape,{
+    depth:.065,bevelEnabled:true,bevelSize:.014,bevelThickness:-rimZ,
+    bevelSegments:3,steps:1,curveSegments
+  });
+  // The first lid faces close the front. Replace that lid with the ear cup.
+  const frontCapCount=shellGeo.groups[0].count/2;
+  shellGeo.setDrawRange(frontCapCount,shellGeo.attributes.position.count-frontCapCount);
+  mesh(parent,shellGeo,purple,0,0,0).scale.x=side;
+
+  const outline=shape.getPoints(curveSegments);
+  outline.pop(); // The last point duplicates the first.
+  outline.reverse(); // Winding faces the front (-Z).
+  const center=new T.Vector2(.019,.046);
+  const rim=purple.color;
+  const lilac=new T.Color(0xae72d3);
+  const shadow=new T.Color(0x542476);
+  const rings=[
+    [1,rimZ,rim],
+    [.90,rimZ+.002,rim.clone().lerp(lilac,.36)],
+    [.77,.003,lilac],
+    [.59,.026,lilac.clone().lerp(shadow,.24)],
+    [.36,.047,lilac.clone().lerp(shadow,.56)],
+    [.16,.058,shadow]
+  ];
+  const positions=[], colors=[], indices=[];
+  const count=outline.length;
+  for(const [radius,z,color] of rings){
+    for(const point of outline){
+      positions.push(center.x+(point.x-center.x)*radius,
+        center.y+(point.y-center.y)*radius,z);
+      colors.push(color.r,color.g,color.b);
+    }
+  }
+  const floor=rings.length*count;
+  positions.push(center.x,center.y,.061);
+  colors.push(shadow.r,shadow.g,shadow.b);
+  for(let ring=0;ring<rings.length;ring++){
+    for(let i=0;i<count;i++){
+      const current=ring*count+i;
+      const next=ring*count+(i+1)%count;
+      if(ring===rings.length-1){
+        indices.push(current,floor,next);
+      }else{
+        indices.push(current,current+count,next,next,current+count,next+count);
+      }
+    }
+  }
+  const cupGeo=new T.BufferGeometry();
+  cupGeo.setAttribute('position',new T.Float32BufferAttribute(positions,3));
+  cupGeo.setAttribute('color',new T.Float32BufferAttribute(colors,3));
+  cupGeo.setIndex(indices);
+  cupGeo.computeVertexNormals();
+  mesh(parent,cupGeo,earCupMaterial,0,0,0).scale.x=side;
 }
 const irisMaps = [], eyes=[];
+const eyeHeight=.211, eyeScaleY=.94;
 const ears=[];
 const upperMuzzle=new T.Group();
 head.add(upperMuzzle);
@@ -66599,17 +66669,20 @@ function twitchEars(t){
 for(const s of [-1,1]){
   const pivot=new T.Group();
   pivot.name=s<0?'Left ear':'Right ear';
-  pivot.position.set(s*.221,.327,-.066);
+  pivot.position.set(s*.216,.348,-.074);
   head.add(pivot);
-  ear(pivot,purple,s,false);
-  ear(pivot,innerEar,s,true);
+  const shell=new T.Group();
+  shell.rotation.y=-s*.16;
+  pivot.add(shell);
+  ear(shell,s);
   ears.push({pivot,side:s,next:null,duration:.35,strength:.26});
   const eye=new T.Group();
-  eye.position.set(s*.151,.158,-.247);
+  eye.position.set(s*.151,eyeHeight,-.272);
+  eye.scale.y=eyeScaleY;
   eye.rotation.y=s*-.24;
   eye.rotation.z=s*-.13;
   head.add(eye);eyes.push(eye);
-  oval(eye,deep,0,0,-.003,.128,.148,.049);
+  oval(eye,deep,0,0,-.003,.123,.140,.049);
   oval(eye,material(0xb891ea,.28),0,0,-.031,.113,.132,.030);
   const iris=mesh(eye,irisGeometry(.105,.123),new T.MeshBasicMaterial({map:galaxy(s===1?84:121),side:T.DoubleSide,toneMapped:false}),0,0,-.062);
   iris.rotation.y=Math.PI;
@@ -66618,7 +66691,7 @@ for(const s of [-1,1]){
   tube(eye,lavender,[[-.094,.071,-.026],[-.051,.124,-.041],[.023,.132,-.045],[.095,.08,-.025]],.011,16);
   const pad=new T.Group();
   upperMuzzle.add(pad);muzzle.push(pad);
-  const cheek=oval(pad,lavender,s*.081,.019,-0.28456,.109,.073,.074);
+  const cheek=oval(pad,lavender,s*.081,.009,-0.28456,.109,.060,.074);
   for(let j=0;j<3;j++) {
     const y=.036-j*.025;
     const x=s*(.078+j*.021), rootY=.024+(j%2)*.014;
@@ -66755,8 +66828,8 @@ function speak(dt){
     pad.position.x=(index===0?-1:1)*spread*.014;
   });
   eyes.forEach((eye,i)=>{
-    eye.scale.y=1-.074*mouthAmount+.032*spread;
-    eye.position.y=.158+.009*mouthAmount;
+    eye.scale.y=eyeScaleY*(1-.074*mouthAmount+.032*spread);
+    eye.position.y=eyeHeight+.009*mouthAmount;
     eye.rotation.z=(i?1:-1)*(-.13+.045*spread);
   });
   // A soft palate-facing lift follows brighter speech sounds. The tongue
