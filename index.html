@@ -66647,7 +66647,7 @@ function ear(parent,side) {
   mesh(parent,cupGeo,earCupMaterial,0,0,0).scale.x=side;
 }
 const irisMaps = [], eyes=[];
-const eyeHeight=.211, eyeScaleY=.94;
+const eyeHeight=.211, eyeScaleY=.9964;
 const ears=[];
 const upperMuzzle=new T.Group();
 head.add(upperMuzzle);
@@ -66684,8 +66684,8 @@ for(const s of [-1,1]){
   ear(shell,s);
   ears.push({pivot,side:s,next:null,duration:.35,strength:.26});
   const eye=new T.Group();
-  eye.position.set(s*.151,eyeHeight,-.272);
-  eye.scale.y=eyeScaleY;
+  eye.position.set(s*.144,eyeHeight,-.272);
+  eye.scale.set(1.06,eyeScaleY,1);
   eye.rotation.y=s*-.24;
   eye.rotation.z=s*-.13;
   head.add(eye);eyes.push(eye);
