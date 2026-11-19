@@ -66217,6 +66217,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
 renderer.outputColorSpace = T.SRGBColorSpace;
 renderer.toneMapping = T.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.18;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = T.PCFSoftShadowMap;
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
 document.body.prepend(renderer.domElement);
@@ -66964,16 +66966,40 @@ const environment = texture(512,256,(ctx,w,h)=>{
   const g=ctx.createLinearGradient(0,0,0,h);
   g.addColorStop(0,'#eeeeff');g.addColorStop(.5,'#a39bab');g.addColorStop(1,'#5b5370');
   ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
-  ctx.fillStyle='#ffffff';ctx.fillRect(35,47,98,54);ctx.fillRect(220,51,53,64);ctx.fillRect(391,32,106,75);
 });
 environment.mapping=T.EquirectangularReflectionMapping;
 scene.environment=environment;
-scene.environmentIntensity=.82;
-scene.add(new T.HemisphereLight(0xf7f4ff,0xc8bcde,2.35));
-const key = new T.DirectionalLight(0xfff4fe,2.12);
-key.position.set(-3,5,-1.8);scene.add(key);
-const rim = new T.DirectionalLight(0xd4e5ff,1.55);
-rim.position.set(3,3,-7);scene.add(rim);
+scene.environmentIntensity=.58;
+scene.add(new T.HemisphereLight(0xd9e6ff,0x8e79ac,.96));
+
+const sunDirection=new T.Vector3(-.30,.30,-1).normalize();
+const sunlight=new T.DirectionalLight(0xffebc9,3.3);
+sunlight.castShadow=true;
+sunlight.shadow.mapSize.set(2048,2048);
+sunlight.shadow.camera.near=.5;
+sunlight.shadow.camera.far=36;
+sunlight.shadow.bias=-.00015;
+sunlight.shadow.normalBias=.006;
+scene.add(sunlight,sunlight.target);
+
+const sunMap=texture(256,256,(ctx,w,h)=>{
+  const glow=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
+  glow.addColorStop(0,'#ffffee');
+  glow.addColorStop(.285,'#fff8d7');
+  glow.addColorStop(.31,'#ffdf9d');
+  glow.addColorStop(.324,'#ffd08080');
+  glow.addColorStop(.46,'#ffac4b35');
+  glow.addColorStop(.72,'#ff932210');
+  glow.addColorStop(1,'#ff932200');
+  ctx.fillStyle=glow;
+  ctx.fillRect(0,0,w,h);
+});
+const sun=new T.Sprite(new T.SpriteMaterial({
+  map:sunMap,transparent:true,depthWrite:false,toneMapped:false
+}));
+sun.name='Sun';
+sun.scale.set(330,330,1);
+scene.add(sun);
 
 const starMap=texture(2048,1024,(ctx,w,h)=>{
   ctx.fillStyle='#030511';ctx.fillRect(0,0,w,h);
@@ -67003,6 +67029,33 @@ for(const [count,size,color] of [[1900,1.1,0xbacaff],[630,1.6,0xfff5e8],[170,2,0
   pinStars.add(new T.Points(geo,new T.PointsMaterial({size,color,sizeAttenuation:false,toneMapped:false})));
 }
 const openingW=2.32, openingH=2.52, bottom=.14;
+const mirrorClearance=.82;
+function stopAtMirror(previous,next){
+  const dz=next.z-previous.z;
+  if(!dz) return false;
+  const side=previous.z>=mirrorZ?1:-1;
+  const limit=mirrorZ+side*mirrorClearance;
+  if(dz*side>=0 || (next.z-limit)*side>=0) return false;
+
+  // Sweep to the frame, including the edge of the player's collision bounds.
+  let entry=T.MathUtils.clamp((limit-previous.z)/dz,0,1);
+  let exit=T.MathUtils.clamp((mirrorZ-previous.z)/dz,entry,1);
+  const halfWidth=openingW/2+.23;
+  for(const [axis,low,high] of [['x',-halfWidth,halfWidth],['y',bottom-.23,bottom+openingH+.23]]){
+    const start=previous[axis], travel=next[axis]-start;
+    if(!travel){
+      if(start<low || start>high) return false;
+      continue;
+    }
+    const near=(low-start)/travel, far=(high-start)/travel;
+    entry=Math.max(entry,Math.min(near,far));
+    exit=Math.min(exit,Math.max(near,far));
+    if(entry>exit) return false;
+  }
+  next.z=limit;
+  return true;
+}
+
 const frontWall=new T.Group();scene.add(frontWall);
 const frame=material(0xaba5cb,.28,.55);
 for(const sign of [-1,1]){
@@ -67051,6 +67104,42 @@ avatar.traverse(part=>{
   }
   part.material=mirrorMaterials.get(source);
 });
+// Solid surfaces cast shadows. Fine fur receives the underlying body shadow.
+for(const root of [craft,avatar,...paws.map(limb=>limb.livePaw)]){
+  root.traverse(part=>{
+    if(!part.isMesh || part.material.transparent) return;
+    part.castShadow=!part.name.includes('fur');
+    part.receiveShadow=part.material.isMeshStandardMaterial;
+  });
+}
+frontWall.children.forEach(part=>{
+  if(part.material===frame) part.receiveShadow=true;
+});
+const skyCenter=new T.Vector3();
+const reflectedCenter=new T.Vector3();
+function updateSun(){
+  // Follow the viewer in translation only, so flight cannot change the sun's bearing.
+  camera.getWorldPosition(skyCenter);
+  sun.position.copy(skyCenter).addScaledVector(sunDirection,2100);
+
+  // Keep the shadow map centered on the moving craft and its nearby reflection.
+  const target=sunlight.target.position.copy(craft.position);
+  target.y+=.65;
+  const mirrorDistance=Math.abs(craft.position.z-mirrorZ);
+  let extent=2;
+  if(reflected.visible && mirrorDistance<7){
+    reflectedCenter.copy(avatar.position);
+    reflectedCenter.y+=.65;
+    reflectedCenter.z=2*mirrorZ-reflectedCenter.z;
+    target.lerp(reflectedCenter,.5);
+    extent+=mirrorDistance;
+  }
+  sunlight.position.copy(target).addScaledVector(sunDirection,18);
+  const shadowCamera=sunlight.shadow.camera;
+  shadowCamera.left=shadowCamera.bottom=-extent;
+  shadowCamera.right=shadowCamera.top=extent;
+  shadowCamera.updateProjectionMatrix();
+}
 let engine,osc,gain,harmonic,overtone,pan;
 function unlockEngine(){
   try{
@@ -67180,6 +67269,9 @@ button.addEventListener('click',async()=>{
 detectXR();
 const up=T.Object3D.DEFAULT_UP;
 const rawPosition=new T.Vector3();
+const previousViewer=new T.Vector3();
+const previousDesktop=new T.Vector3();
+const intendedViewer=new T.Vector3();
 const torsoTracker=new T.Vector3(),leanWorld=new T.Vector3(),leanLocal=new T.Vector3();
 const rotatedHead=new T.Vector3();
 const displacement=new T.Vector3();
@@ -67278,12 +67370,115 @@ function clearChest(point){
     *Math.max(0,.40-Math.abs(point.x)*.62+point.z);
   point.z-=clearance;
 }
+// Ellipsoids follow the torso bends and head pose in the cat's local space.
+const pawRadius=.12;
+function pawCollider(x,y,z,rx,ry,rz,part=null){
+  const padding=pawRadius/Math.min(rx,ry,rz);
+  const padded=radius=>Math.sqrt((1+padding)*radius*radius+(1+1/padding)*pawRadius*pawRadius);
+  return {
+    offset:new T.Vector3(x,y,z), center:new T.Vector3(), part,
+    rotation:new T.Quaternion(), inverse:new T.Quaternion(),
+    size:new T.Vector3(padded(rx),padded(ry),padded(rz))
+  };
+}
+const pawColliders=[
+  pawCollider(0,.29,-.074,.285,.344,.255),
+  pawCollider(-.20,.13,-.025,.162,.17,.215),
+  pawCollider(.20,.13,-.025,.162,.17,.215),
+  pawCollider(0,.132,0,.37,.33,.30,head),
+  // Keep the eyes, muzzle and open mouth behind a continuous face surface.
+  pawCollider(0,.105,-.249,.238,.245,.158,head),
+  pawCollider(0,-.053,-.285,.127,.101,.122,head),
+  ...ears.map(({pivot,side})=>pawCollider(-side*.022,.113,.012,.163,.188,.080,pivot))
+];
+function updatePawColliders(){
+  for(const {offset,center,part,rotation,inverse} of pawColliders){
+    center.copy(offset);
+    if(part){
+      rotation.copy(part.quaternion);
+      center.applyQuaternion(rotation).add(part.position);
+      if(part!==head){
+        rotation.premultiply(head.quaternion);
+        center.applyQuaternion(head.quaternion).add(head.position);
+      }
+    }else{
+      followSpine(center);
+    }
+    inverse.copy(rotation).invert();
+  }
+}
+const sweepStart=new T.Vector3(), sweepDelta=new T.Vector3(), collisionNormal=new T.Vector3();
+const pawDestination=new T.Vector3(), pawRemaining=new T.Vector3();
+const front=new T.Vector3(0,0,-1);
+const pawHit=new T.Vector3(), pawFrom=new T.Vector3(), pawTo=new T.Vector3();
+function normalizedPawPoint(point,collider,result){
+  return result.copy(point).sub(collider.center).applyQuaternion(collider.inverse).divide(collider.size);
+}
+function movePawOutside(point){
+  // A moving head can enclose yesterday's contact point. Find the front end
+  // of the connected collision volumes along a ray from that point.
+  let distance=0;
+  for(let pass=0;pass<pawColliders.length;pass++){
+    const previous=distance;
+    for(const collider of pawColliders){
+      const offset=normalizedPawPoint(point,collider,sweepStart);
+      const ray=sweepDelta.copy(front).applyQuaternion(collider.inverse).divide(collider.size);
+      const a=ray.lengthSq(), b=offset.dot(ray), c=offset.lengthSq()-1;
+      const determinant=b*b-a*c;
+      if(determinant<=0) continue;
+      const root=Math.sqrt(determinant);
+      const entry=(-b-root)/a, exit=(-b+root)/a;
+      if(entry<=distance && exit>distance) distance=exit+.001;
+    }
+    if(distance===previous) break;
+  }
+  point.addScaledVector(front,distance);
+}
+function constrainPaw(previous,desired,result){
+  pawDestination.copy(desired);
+  result.copy(previous);
+  movePawOutside(result);
+  for(let pass=0;pass<3;pass++){
+    pawRemaining.subVectors(pawDestination,result);
+    if(pawRemaining.lengthSq()<1e-10) break;
+    let impact=1, hitCollider=null;
+    for(const collider of pawColliders){
+      const offset=normalizedPawPoint(result,collider,sweepStart);
+      const travel=sweepDelta.copy(pawRemaining).applyQuaternion(collider.inverse).divide(collider.size);
+      const a=travel.lengthSq(), b=offset.dot(travel), c=offset.lengthSq()-1;
+      const determinant=b*b-a*c;
+      if(b>=0 || determinant<=0) continue;
+      const time=(-b-Math.sqrt(determinant))/a;
+      if(time>=0 && time<impact){
+        impact=time;
+        hitCollider=collider;
+      }
+    }
+    result.addScaledVector(pawRemaining,impact);
+    if(!hitCollider) break;
+    normalizedPawPoint(result,hitCollider,collisionNormal).divide(hitCollider.size)
+      .applyQuaternion(hitCollider.rotation).normalize();
+    result.addScaledVector(collisionNormal,.001);
+    pawRemaining.multiplyScalar(1-impact);
+    pawDestination.copy(result).addScaledVector(pawRemaining,1)
+      .addScaledVector(collisionNormal,-Math.min(0,pawRemaining.dot(collisionNormal)));
+  }
+  movePawOutside(result);
+}
+const catWorldOrigin=new T.Vector3();
+const catToWorld=new T.Quaternion(), rigInverse=new T.Quaternion();
+const livePawTarget=new T.Vector3();
 function posePaws(frame,reference,inputs,viewer,dt,t){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
   trackingToCat.setFromAxisAngle(up,rig.rotation.y).premultiply(catInverse);
   catToTracking.copy(trackingToCat).invert();
   eyeAnchor.set(0,eyeHeight,-.272).applyQuaternion(head.quaternion).add(head.position);
   const blend=1-Math.exp(-23*dt);
+  updatePawColliders();
+  catWorldOrigin.copy(cat.position).applyQuaternion(ufo.quaternion).add(ufo.position)
+    .applyQuaternion(avatar.quaternion).add(avatar.position);
+  catToWorld.copy(catInverse).invert();
+  rigInverse.copy(rig.quaternion).invert();
   for(const limb of paws){
     const side=Math.sign(limb.shoulder.x);
     const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):vrShoulder.copy(limb.shoulder);
@@ -67308,7 +67503,6 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       // Map the user's eye-to-hand displacement onto the avatar's face and body.
       handTarget.set(position.x-viewer.x,position.y-viewer.y,position.z-viewer.z)
         .applyQuaternion(trackingToCat).multiplyScalar(.73).add(eyeAnchor);
-      clearChest(handTarget);
       handTarget.sub(shoulder).clampLength(0,.62).add(shoulder);
       handTarget.y=Math.max(.065,handTarget.y);
     }else{
@@ -67323,7 +67517,8 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       wrist.setFromAxisAngle(up,side*.18*lift);
     }
     const smoothing=tracked&&!wasTracked?1:blend;
-    limb.paw.position.lerp(handTarget,smoothing);
+    handTarget.lerpVectors(limb.paw.position,handTarget,smoothing);
+    constrainPaw(limb.paw.position,handTarget,limb.paw.position);
     const elbow=armElbow.copy(shoulder).lerp(limb.paw.position,.48);
     const reach=armDirection.copy(limb.paw.position).sub(shoulder).length();
     const fold=T.MathUtils.clamp(1-reach/(frame?.62:.55),.06,1);
@@ -67336,12 +67531,23 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
     if(tracked)armWrist.add(armDirection.set(0,0,.025).applyQuaternion(limb.paw.quaternion));
     shapeForeleg(limb.foreleg,side,elbow,armWrist);
     if(tracked){
-      // Render at the real tracked position in XR reference space. The rig
-      // supplies the same turning and flying transform as the headset camera.
       const {position}=tracked.transform;
       limb.livePaw.quaternion.copy(limb.paw.quaternion).premultiply(catToTracking);
-      limb.livePaw.position.set(0,0,-.047).applyQuaternion(limb.livePaw.quaternion)
+      livePawTarget.set(0,0,-.047).applyQuaternion(limb.livePaw.quaternion)
         .add(armWrist.set(position.x,position.y,position.z));
+      // Resolve the first-person paw against the unreflected avatar, then
+      // convert it back to XR tracking space for rendering.
+      pawTo.copy(livePawTarget).applyQuaternion(rig.quaternion).add(rig.position)
+        .sub(catWorldOrigin).applyQuaternion(catInverse);
+      if(wasTracked){
+        pawFrom.copy(limb.livePaw.position).applyQuaternion(rig.quaternion).add(rig.position)
+          .sub(catWorldOrigin).applyQuaternion(catInverse);
+      }else{
+        pawFrom.copy(pawTo);
+      }
+      constrainPaw(pawFrom,pawTo,pawHit);
+      limb.livePaw.position.copy(pawHit).applyQuaternion(catToWorld).add(catWorldOrigin)
+        .sub(rig.position).applyQuaternion(rigInverse);
     }
   }
 }
@@ -67423,6 +67629,7 @@ renderer.setAnimationLoop((ms,frame)=>{
         origin.copy(rawPosition).applyAxisAngle(up,-startYaw);
         rig.rotation.y=-startYaw;
         rig.position.set(-origin.x,0,-origin.z);
+        previousViewer.set(0,position.y,0);
         anchored=true;
       }
       const [turn,lift]=stick(inputs.find(input=>input.handedness==='right')?.gamepad);
@@ -67434,8 +67641,15 @@ renderer.setAnimationLoop((ms,frame)=>{
       }
       const [strafe,walk]=stick(inputs.find(input=>input.handedness==='left')?.gamepad);
       fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,inputs.find(i=>i.handedness==='right')?.gamepad?.buttons[4]?.pressed,dt);
-      rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
-      x=rotatedHead.x;z=rotatedHead.z;
+      intendedViewer.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
+      intendedViewer.y+=position.y;
+      const desiredZ=intendedViewer.z;
+      if(stopAtMirror(previousViewer,intendedViewer)){
+        rig.position.z+=intendedViewer.z-desiredZ;
+        velocity.z=0;
+      }
+      previousViewer.copy(intendedViewer);
+      x=intendedViewer.x;z=intendedViewer.z;
       torsoTracker.lerp(leanWorld.set(position.x,position.y,position.z),1-Math.exp(-2.2*dt));
       leanWorld.sub(torsoTracker).clampLength(0,.19).applyAxisAngle(up,rig.rotation.y);
       avatarHeight=position.y+rig.position.y;
@@ -67449,7 +67663,9 @@ renderer.setAnimationLoop((ms,frame)=>{
     const pressed=(a,b)=>Number(moveKeys.has(a)||moveKeys.has(b));
     const dx=pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft');
     const dz=pressed('KeyS','ArrowDown')-pressed('KeyW','ArrowUp');
+    previousDesktop.copy(desktopPosition);
     fly(desktopPosition,dx,Number(moveKeys.has('KeyE'))-Number(moveKeys.has('KeyQ')),dz,desktopYaw,moveKeys.has('Space'),dt);
+    if(stopAtMirror(previousDesktop,desktopPosition)) velocity.z=0;
     desktopCamera();
     x=desktopPosition.x;z=desktopPosition.z;
     avatarHeight=desktopPosition.y;
@@ -67489,9 +67705,9 @@ renderer.setAnimationLoop((ms,frame)=>{
   irisMaps[0].rotation=t*.53;
   irisMaps[1].rotation=t*.41+.48;
   animateTail(t);
-  posePaws(frame,tracking,inputs,viewer,dt,t);
   speak(dt);
   twitchEars(t);
+  posePaws(frame,tracking,inputs,viewer,dt,t);
   flexWhiskers(dt,t);
   const pulse=.5-.5*Math.cos(t*2*Math.PI/5);
   const lightHue=(.43+t/32+.28*mouthAmount+.04*spread)%1;
@@ -67550,6 +67766,7 @@ renderer.setAnimationLoop((ms,frame)=>{
     overtone.gain.setTargetAtTime(.18+.15*boostSpeed+.28*Math.abs(lateral)+.18*Math.max(0,climb),now,.06);
     pan.pan.setTargetAtTime(.74*lateral,now,.07);
   }
+  updateSun();
   try { renderer.render(scene,camera); }
   catch(error){
     renderer.setAnimationLoop(null);
