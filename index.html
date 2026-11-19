@@ -67151,6 +67151,27 @@ function fly(position,x,y,z,heading,boost,dt){
   velocity.lerp(target,1-Math.exp(-5*dt));
   position.addScaledVector(velocity,dt);
 }
+// Sweep the player against the framed glass. Keep tangential movement on impact.
+const previousViewer=new T.Vector3(), nextViewer=new T.Vector3();
+const mirrorMin=[-openingW/2-.94,bottom-.35,mirrorZ-.99];
+const mirrorMax=[openingW/2+.94,bottom+openingH+1.42,mirrorZ+.99];
+function stopAtMirror(previous,next){
+  let enter=-Infinity,leave=Infinity,axis=0;
+  for(let i=0;i<3;i++){
+    const start=previous.getComponent(i),delta=next.getComponent(i)-start;
+    if(Math.abs(delta)<1e-9){
+      if(start<mirrorMin[i]||start>mirrorMax[i])return;
+      continue;
+    }
+    const a=(mirrorMin[i]-start)/delta,b=(mirrorMax[i]-start)/delta;
+    if(Math.min(a,b)>enter){enter=Math.min(a,b);axis=i;}
+    leave=Math.min(leave,Math.max(a,b));
+  }
+  if(enter<0||enter>1||enter>leave)return;
+  const forward=next.getComponent(axis)>previous.getComponent(axis);
+  next.setComponent(axis,forward?mirrorMin[axis]-.0001:mirrorMax[axis]+.0001);
+  velocity.setComponent(axis,0);
+}
 let drag=null, desktopYaw=0, desktopPitch=Math.atan2(-.21,1.09-mirrorZ);
 const desktopPosition=new T.Vector3(0,1.38,1.09);
 const moveKeys=new Set();
@@ -67340,11 +67361,60 @@ function clearChest(point){
     *Math.max(0,.40-Math.abs(point.x)*.62+point.z);
   point.z-=clearance;
 }
+// Solve in cat space so tracking, forelegs and the reflection share one contact point.
+const pawSolids=[];
+function pawSolid(x,y,z,rx,ry,rz,parent){
+  pawSolids.push({offset:new T.Vector3(x,y,z),center:new T.Vector3(),
+    radii:new T.Vector3(rx,ry,rz),rotation:new T.Quaternion(),inverse:new T.Quaternion(),parent});
+}
+// Radii include clearance for the palm and toes through wrist rotations.
+pawSolid(0,.29,-.07,.413,.471,.396,null);
+pawSolid(0,.328,-.278,.287,.362,.197,null);
+for(const sign of [-1,1])pawSolid(sign*.212,.12,-.05,.275,.30,.35,null);
+pawSolid(0,.132,0,.50,.46,.435,head);
+pawSolid(0,.037,-.285,.33,.214,.239,head);
+pawSolid(0,-.018,-.09,.24,.202,.238,jaw);
+const contactLocal=new T.Vector3(),contactGoal=new T.Vector3();
+function updatePawSolids(){
+  for(const solid of pawSolids){
+    const {center,offset,parent,rotation,inverse}=solid;
+    center.copy(offset);
+    if(parent){
+      rotation.copy(head.quaternion);
+      if(parent===jaw){
+        center.applyQuaternion(jaw.quaternion).add(jaw.position);
+        rotation.multiply(jaw.quaternion);
+      }
+      center.applyQuaternion(head.quaternion).add(head.position);
+    }else followSpine(center);
+    inverse.copy(rotation).invert();
+  }
+}
+function slidePaw(point,target,blend,side){
+  contactGoal.copy(point).lerp(target,blend);
+  const steps=Math.max(1,Math.ceil(point.distanceTo(contactGoal)/.025));
+  for(let i=steps;i>0;i--){
+    point.lerp(contactGoal,1/i);
+    for(let pass=0;pass<8;pass++){
+      let clear=true;
+      for(const {center,radii,rotation,inverse} of pawSolids){
+        contactLocal.copy(point).sub(center).applyQuaternion(inverse).divide(radii);
+        const d=contactLocal.length();
+        if(d>=.99999)continue;
+        if(d<.00001)contactLocal.set(side*.3,0,-1);
+        point.copy(contactLocal.normalize()).multiply(radii).applyQuaternion(rotation).add(center);
+        clear=false;
+      }
+      if(clear)break;
+    }
+  }
+}
 function posePaws(frame,reference,inputs,viewer,dt,t){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
   trackingToCat.setFromAxisAngle(up,rig.rotation.y).premultiply(catInverse);
   catToTracking.copy(trackingToCat).invert();
   eyeAnchor.set(0,eyeHeight,-.272).applyQuaternion(head.quaternion).add(head.position);
+  updatePawSolids();
   const blend=1-Math.exp(-23*dt);
   for(const limb of paws){
     const side=Math.sign(limb.shoulder.x);
@@ -67358,7 +67428,6 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       const grip=input.gripSpace??(input.targetRayMode==='tracked-pointer'?input.targetRaySpace:null);
       if(!tracked && grip)tracked=frame.getPose(grip,reference);
     }
-    const wasTracked=limb.tracked;
     limb.tracked=!!tracked;
     limb.livePaw.visible=limb.tracked;
     handTarget.copy(limb.rest);
@@ -67370,7 +67439,7 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       // Map the user's eye-to-hand displacement onto the avatar's face and body.
       handTarget.set(position.x-viewer.x,position.y-viewer.y,position.z-viewer.z)
         .applyQuaternion(trackingToCat).multiplyScalar(.73).add(eyeAnchor);
-      clearChest(handTarget);
+
       handTarget.sub(shoulder).clampLength(0,.62).add(shoulder);
       handTarget.y=Math.max(.065,handTarget.y);
     }else{
@@ -67384,8 +67453,8 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       handTarget.z-=.036*brace;
       wrist.setFromAxisAngle(up,side*.18*lift);
     }
-    const smoothing=tracked&&!wasTracked?1:blend;
-    limb.paw.position.lerp(handTarget,smoothing);
+    const smoothing=blend;
+    slidePaw(limb.paw.position,handTarget,smoothing,side);
     const elbow=armElbow.copy(shoulder).lerp(limb.paw.position,.48);
     const reach=armDirection.copy(limb.paw.position).sub(shoulder).length();
     const fold=T.MathUtils.clamp(1-reach/(frame?.62:.55),.06,1);
@@ -67398,12 +67467,12 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
     if(tracked)armWrist.add(armDirection.set(0,0,.025).applyQuaternion(limb.paw.quaternion));
     shapeForeleg(limb.foreleg,side,elbow,armWrist);
     if(tracked){
-      // Render at the real tracked position in XR reference space. The rig
-      // supplies the same turning and flying transform as the headset camera.
-      const {position}=tracked.transform;
       limb.livePaw.quaternion.copy(limb.paw.quaternion).premultiply(catToTracking);
-      limb.livePaw.position.set(0,0,-.047).applyQuaternion(limb.livePaw.quaternion)
-        .add(armWrist.set(position.x,position.y,position.z));
+      limb.livePaw.position.copy(limb.paw.position).sub(eyeAnchor)
+        .multiplyScalar(1/.73).applyQuaternion(catToTracking);
+      limb.livePaw.position.x+=viewer.x;
+      limb.livePaw.position.y+=viewer.y;
+      limb.livePaw.position.z+=viewer.z;
     }
   }
 }
@@ -67485,6 +67554,7 @@ renderer.setAnimationLoop((ms,frame)=>{
         origin.copy(rawPosition).applyAxisAngle(up,-startYaw);
         rig.rotation.y=-startYaw;
         rig.position.set(-origin.x,0,-origin.z);
+        previousViewer.set(0,position.y,0);
         anchored=true;
       }
       const [turn,lift]=stick(inputs.find(input=>input.handedness==='right')?.gamepad);
@@ -67497,7 +67567,12 @@ renderer.setAnimationLoop((ms,frame)=>{
       const [strafe,walk]=stick(inputs.find(input=>input.handedness==='left')?.gamepad);
       fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,inputs.find(i=>i.handedness==='right')?.gamepad?.buttons[4]?.pressed,dt);
       rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
-      x=rotatedHead.x;z=rotatedHead.z;
+      nextViewer.set(rotatedHead.x,position.y+rig.position.y,rotatedHead.z);
+      const before=displacement.copy(nextViewer);
+      stopAtMirror(previousViewer,nextViewer);
+      rig.position.sub(before.sub(nextViewer));
+      previousViewer.copy(nextViewer);
+      x=nextViewer.x;z=nextViewer.z;
       torsoTracker.lerp(leanWorld.set(position.x,position.y,position.z),1-Math.exp(-2.2*dt));
       leanWorld.sub(torsoTracker).clampLength(0,.19).applyAxisAngle(up,rig.rotation.y);
       avatarHeight=position.y+rig.position.y;
@@ -67511,7 +67586,9 @@ renderer.setAnimationLoop((ms,frame)=>{
     const pressed=(a,b)=>Number(moveKeys.has(a)||moveKeys.has(b));
     const dx=pressed('KeyD','ArrowRight')-pressed('KeyA','ArrowLeft');
     const dz=pressed('KeyS','ArrowDown')-pressed('KeyW','ArrowUp');
+    previousViewer.copy(desktopPosition);
     fly(desktopPosition,dx,Number(moveKeys.has('KeyE'))-Number(moveKeys.has('KeyQ')),dz,desktopYaw,moveKeys.has('Space'),dt);
+    stopAtMirror(previousViewer,desktopPosition);
     desktopCamera();
     x=desktopPosition.x;z=desktopPosition.z;
     avatarHeight=desktopPosition.y;
@@ -67551,8 +67628,8 @@ renderer.setAnimationLoop((ms,frame)=>{
   irisMaps[0].rotation=t*.53;
   irisMaps[1].rotation=t*.41+.48;
   animateTail(t);
-  posePaws(frame,tracking,inputs,viewer,dt,t);
   speak(dt);
+  posePaws(frame,tracking,inputs,viewer,dt,t);
   twitchEars(t);
   flexWhiskers(dt,t);
   const pulse=.5-.5*Math.cos(t*2*Math.PI/5);
