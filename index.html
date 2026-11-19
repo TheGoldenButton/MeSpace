@@ -66268,7 +66268,11 @@ function rng(seed) {
 function fur(kind) {
   const map=texture(1024,512,(ctx,w,h)=>{
     const base=ctx.createLinearGradient(0,0,0,h);
-    base.addColorStop(0,'#a751e7');base.addColorStop(.47,'#8035c4');base.addColorStop(1,'#6026a2');
+    if(kind==='light'){
+      base.addColorStop(0,'#e7bbf7');base.addColorStop(.47,'#d496ef');base.addColorStop(1,'#c486e4');
+    }else{
+      base.addColorStop(0,'#a751e7');base.addColorStop(.47,'#8035c4');base.addColorStop(1,'#6026a2');
+    }
     ctx.fillStyle=base;ctx.fillRect(0,0,w,h);
     function stripe(x,y,dx,dy,width) {
       ctx.fillStyle='#67ce54';
@@ -66326,7 +66330,7 @@ function fur(kind) {
         ctx.closePath();
         ctx.fill();
       }
-    }else{
+    }else if(kind==='body'){
       const rows=[102,180,253,325,407];
       const spans=[189,226,246,235,192];
       rows.forEach((y,i)=>{
@@ -66388,6 +66392,9 @@ const purple = coat(0x8834c7,.81,null);
 const green = material(0x75d95a,.65);
 const lavender = coat(0xd496ef,.87,null);
 lavender.normalScale.set(.20,.20);
+const lightFur=coat(0xffffff,.89,fur('light'));
+lightFur.map.offset.x=.5;
+const furPixels=new WeakMap();
 const deep = material(0x2a103f,.62);
 const innerEar = material(0xf18dd6,.66);
 const earCupMaterial = material(0xffffff,.72,0,{vertexColors:true});
@@ -66499,8 +66506,9 @@ cat.position.y=.30;
 ufo.add(cat);
 const trunk=[
   oval(cat,bodyFur,0,.29,-.07,.283,.341,.255),
-  oval(cat,lavender,0,.328,-.278,.157,.232,.059)
+  oval(cat,lightFur,0,.328,-.278,.157,.232,.059)
 ];
+trunk.push(addLightFur(cat,trunk[1],'Chest fur',2500,141,.73));
 // Bend from the seated pelvis through the ribs. Both fur surfaces use
 // identical weights at the same height so the belly marking stays attached.
 function spineWeight(y){
@@ -66513,14 +66521,17 @@ for(const s of [-1,1]){
   oval(cat,purple,s*.243,.064,-.124,.125,.078,.144);
   const shoulder = new T.Vector3(s*.146,.329,-.168);
   const rest = new T.Vector3(s*.109,.067,-.286);
-  const arm = oval(cat,legFur,0,0,0,.074,.14,.076);
-  const forearm=oval(cat,legFur,0,0,0,.059,.10,.062);
+  const foreleg=createForeleg(s);
   const paw = new T.Group();
   paw.name=s<0?'Left paw':'Right paw';
   paw.position.copy(rest);
   cat.add(paw);
-  oval(paw,lavender,0,0,0,.082,.065,.099);
-  for(let i=-1;i<=1;i++) oval(paw,lavender,i*.043,-.014,-.065,.025,.029,.038);
+  const palm=oval(paw,lightFur,0,0,0,.082,.065,.099);
+  addLightFur(paw,palm,'Palm fur',740,120+s,.39);
+  for(let i=-1;i<=1;i++){
+    const toe=oval(paw,lightFur,i*.043,-.014,-.065,.025,.029,.038);
+    addLightFur(paw,toe,'Toe fur',145,130+s*4+i,.26);
+  }
   oval(paw,innerEar,0,-.061,.012,.043,.012,.043);
   for(let i=-1;i<=1;i++) oval(paw,innerEar,i*.039,-.038,-.072,.014,.011,.017);
   // Clone before stencil materials are applied to the mirror avatar.
@@ -66529,7 +66540,7 @@ for(const s of [-1,1]){
   livePaw.scale.setScalar(.85);
   livePaw.visible=false;
   rig.add(livePaw);
-  paws.push({hand:s<0?'left':'right',shoulder,rest,arm,forearm,paw,livePaw});
+  paws.push({hand:s<0?'left':'right',shoulder,rest,foreleg,paw,livePaw});
 
 }
 const tailPath = new T.CatmullRomCurve3([[.19,.13,.12],[.36,.13,.20],[.49,.21,.05],[.51,.35,-.10],[.43,.46,-.20],[.34,.45,-.235]].map(p=>new T.Vector3(...p)));
@@ -66704,7 +66715,8 @@ for(const s of [-1,1]){
   tube(eye,lavender,[[-.094,.071,-.026],[-.051,.124,-.041],[.023,.132,-.045],[.095,.08,-.025]],.011,16);
   const pad=new T.Group();
   upperMuzzle.add(pad);muzzle.push(pad);
-  const cheek=oval(pad,lavender,s*.081,.009,-0.28456,.109,.060,.074);
+  const cheek=oval(pad,lightFur,s*.081,.009,-0.28456,.109,.060,.074);
+  addLightFur(pad,cheek,'Muzzle fur',780,160+s,.36);
   for(let j=0;j<3;j++) {
     const y=.036-j*.025;
     const x=s*(.078+j*.021), rootY=.024+(j%2)*.014;
@@ -66732,7 +66744,8 @@ jaw.name='Jaw hinge';
 jaw.position.set(0,-.039,-0.17668);
 head.add(jaw);
 // The mandible extends behind the pivot into the cheeks.
-oval(jaw,lavender,0,-.023,-.067,.095,.048,.122);
+const chin=oval(jaw,lightFur,0,-.023,-.067,.095,.048,.122);
+addLightFur(jaw,chin,'Chin fur',620,168,.36);
 for(const side of [-1,1]){
   const cheek=oval(jaw,faceFur,side*.064,.006,-.046,.041,.055,.098);
   cheek.rotation.x=-.20;
@@ -66857,11 +66870,19 @@ function speak(dt){
   tongue.rotation.x=.08+.23*tongueLift;
 }
 
-// Longer tapered strands build volume along the crown and cheeks.
-function addGuardHairs(parent, name, center, radii, paint, count, seed, maskFace) {
+function addLightFur(parent,surface,name,count,seed,strandScale){
+  return addGuardHairs(parent,name,surface.position.toArray(),surface.scale.toArray(),
+    lightFur.map,count,seed,false,strandScale);
+}
+// Tapered strands give the coat volume along the silhouette.
+function addGuardHairs(parent,name,center,radii,paint,count,seed,maskFace,strandScale=1){
   const rand=rng(seed);
   const image=paint.image;
-  const colors=image.getContext('2d').getImageData(0,0,image.width,image.height).data;
+  if(!furPixels.has(image)){
+    furPixels.set(image,image.getContext('2d').getImageData(0,0,image.width,image.height).data);
+  }
+  const colors=furPixels.get(image);
+  const lightPatch=paint===lightFur.map;
   const positions=[], normals=[], rgb=[];
   const normal=new T.Vector3(), anchor=new T.Vector3(), sweep=new T.Vector3(), side=new T.Vector3();
   const color=new T.Color();
@@ -66874,7 +66895,7 @@ function addGuardHairs(parent, name, center, radii, paint, count, seed, maskFace
     const cheek=maskFace?smooth(Math.abs(x),.45,.88)*(1-smooth(y,.1,.65)):0;
     const bib=maskFace?0:front*(1-smooth(Math.abs(x),.34,.64));
     const density=maskFace?1-.94*front*(1-cheek):1-.88*bib;
-    if(rand()>density)continue;
+    if(rand()>(lightPatch?1:density))continue;
     anchor.set(center[0]+x*radii[0],center[1]+y*radii[1],center[2]+z*radii[2]);
     normal.set(x/radii[0],y/radii[1],z/radii[2]).normalize();
     const crown=maskFace?smooth(y,.30,.82):0;
@@ -66883,8 +66904,9 @@ function addGuardHairs(parent, name, center, radii, paint, count, seed, maskFace
     sweep
       .addScaledVector(normal,-normal.dot(sweep)).normalize();
     side.crossVectors(sweep,normal).normalize();
-    const length=(.010+rand()*.020)*(maskFace?(.76+.95*cheek-.32*front):(1-.68*bib));
-    const width=.0008+rand()*.0010;
+    const length=(.010+rand()*.020)*strandScale
+      *(lightPatch?1:maskFace?(.76+.95*cheek-.32*front):(1-.68*bib));
+    const width=(.0008+rand()*.0010)*Math.sqrt(strandScale);
     const u=(phi/(2*Math.PI)+.5)%1;
     const j=(Math.min(image.height-1,Math.floor(theta/Math.PI*image.height))*image.width+Math.floor(u*image.width))*4;
     color.setRGB(colors[j]/255,colors[j+1]/255,colors[j+2]/255,T.SRGBColorSpace);
@@ -67186,14 +67208,71 @@ function step(dx,dz,angle,speed){
   return displacement.copy(sideStep).multiplyScalar(dx*speed).addScaledVector(forward,-dz*speed);
 }
 const armElbow=new T.Vector3();
-function fitArm(segment,start,end,overlap){
-  segment.position.copy(start).lerp(end,.5);
-  armDirection.copy(end).sub(start);
-  segment.scale.y=armDirection.length()*.5+overlap;
-  segment.quaternion.setFromUnitVectors(up,armDirection.normalize());
+function createForeleg(side){
+  const rings=24, sides=12;
+  const positions=new T.Float32BufferAttribute((rings+1)*(sides+1)*3,3).setUsage(T.DynamicDrawUsage);
+  const normals=positions.clone();
+  const uv=[], indices=[];
+  for(let row=0;row<=rings;row++){
+    for(let column=0;column<=sides;column++){
+      uv.push(column/sides,1-row/rings);
+      if(row===rings || column===sides)continue;
+      const a=row*(sides+1)+column,b=a+sides+1;
+      indices.push(a,a+1,b,b,a+1,b+1);
+    }
+  }
+  const geometry=new T.BufferGeometry();
+  geometry.setAttribute('position',positions);
+  geometry.setAttribute('normal',normals);
+  geometry.setAttribute('uv',new T.Float32BufferAttribute(uv,2));
+  geometry.setIndex(indices);
+  const surface=mesh(cat,geometry,legFur,0,0,0);
+  surface.name=side<0?'Left foreleg':'Right foreleg';
+  surface.frustumCulled=false;
+  const curve=new T.CatmullRomCurve3(Array.from({length:4},()=>new T.Vector3()));
+  return {curve,rings,sides,positions,normals};
 }
+const forelegCenter=new T.Vector3(),forelegTangent=new T.Vector3(),previousTangent=new T.Vector3();
+const forelegNormal=new T.Vector3(),forelegBinormal=new T.Vector3(),forelegRadial=new T.Vector3();
+const forelegVertex=new T.Vector3(),forelegTransport=new T.Quaternion();
 const vrShoulder=new T.Vector3();
 const armWrist=new T.Vector3();
+function shapeForeleg(leg,side,elbow,wrist){
+  const {curve,rings,sides,positions,normals}=leg;
+  const [root,shoulder,joint,end]=curve.points;
+  // The root and last ring sit inside the ribs and paw, respectively.
+  followSpine(root.set(side*.103,.396,-.139));
+  followSpine(shoulder.set(side*.181,.351,-.190));
+  joint.copy(elbow);
+  end.copy(wrist);
+  for(let row=0;row<=rings;row++){
+    const u=row/rings;
+    curve.getPoint(u,forelegCenter);
+    curve.getTangent(u,forelegTangent);
+    if(row===0){
+      forelegNormal.set(1,0,0);
+    }else{
+      forelegTransport.setFromUnitVectors(previousTangent,forelegTangent);
+      forelegNormal.applyQuaternion(forelegTransport);
+    }
+    forelegNormal.addScaledVector(forelegTangent,-forelegNormal.dot(forelegTangent)).normalize();
+    forelegBinormal.crossVectors(forelegTangent,forelegNormal);
+    previousTangent.copy(forelegTangent);
+    const radius=.079+.015*T.MathUtils.smoothstep(u,0,.32)
+      -.038*T.MathUtils.smoothstep(u,.31,.72)-.019*T.MathUtils.smoothstep(u,.68,1);
+    for(let column=0;column<=sides;column++){
+      const angle=column===sides?0:column/sides*2*Math.PI;
+      const x=Math.cos(angle), y=Math.sin(angle);
+      forelegVertex.copy(forelegCenter)
+        .addScaledVector(forelegNormal,x*radius*.87).addScaledVector(forelegBinormal,y*radius);
+      forelegRadial.copy(forelegNormal).multiplyScalar(x/.87).addScaledVector(forelegBinormal,y).normalize();
+      const index=row*(sides+1)+column;
+      positions.setXYZ(index,forelegVertex.x,forelegVertex.y,forelegVertex.z);
+      normals.setXYZ(index,forelegRadial.x,forelegRadial.y,forelegRadial.z);
+    }
+  }
+  positions.needsUpdate=normals.needsUpdate=true;
+}
 function clearChest(point){
   // Fade chest clearance out above the ribs so hands can reach the face.
   const clearance=(1-T.MathUtils.smoothstep(point.y,.38,.54))
@@ -67265,9 +67344,8 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
     }
     limb.paw.quaternion.slerp(wrist,smoothing);
     armWrist.copy(limb.paw.position);
-    if(tracked)armWrist.add(armDirection.set(0,0,.061).applyQuaternion(limb.paw.quaternion));
-    fitArm(limb.arm,shoulder,elbow,.061);
-    fitArm(limb.forearm,elbow,armWrist,.041);
+    if(tracked)armWrist.add(armDirection.set(0,0,.025).applyQuaternion(limb.paw.quaternion));
+    shapeForeleg(limb.foreleg,side,elbow,armWrist);
     if(tracked){
       // Render at the real tracked position in XR reference space. The rig
       // supplies the same turning and flying transform as the headset camera.
