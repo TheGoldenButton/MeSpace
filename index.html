@@ -66542,7 +66542,8 @@ for(const s of [-1,1]){
   livePaw.scale.setScalar(.85);
   livePaw.visible=false;
   rig.add(livePaw);
-  paws.push({hand:s<0?'left':'right',shoulder,rest,foreleg,paw,livePaw});
+  paws.push({hand:s<0?'left':'right',shoulder,rest,foreleg,paw,livePaw,
+    filteredGrip:new T.Vector3(), filteredRotation:new T.Quaternion(), missingTime:Infinity});
 
 }
 const tailPath = new T.CatmullRomCurve3([[.19,.13,.12],[.36,.13,.20],[.49,.21,.05],[.51,.35,-.10],[.43,.46,-.20],[.34,.45,-.235]].map(p=>new T.Vector3(...p)));
@@ -67466,6 +67467,42 @@ function constrainPaw(previous,desired,result){
 }
 const catWorldOrigin=new T.Vector3();
 const catToWorld=new T.Quaternion(), rigInverse=new T.Quaternion();
+const gripPoint=new T.Vector3(), gripRotation=new T.Quaternion();
+const desiredLive=new T.Vector3(), previousLive=new T.Vector3();
+function livePawPose(limb,pose,active,dt){
+  const paw=limb.livePaw;
+  if(!active){
+    paw.visible=false;
+    limb.missingTime=Infinity;
+    return;
+  }
+  const initialize=!paw.visible;
+  if(pose){
+    const {position,orientation}=pose.transform;
+    gripPoint.copy(position);
+    gripRotation.copy(orientation);
+    const distance=limb.filteredGrip.distanceTo(gripPoint);
+    const angle=limb.filteredRotation.angleTo(gripRotation);
+    const rate=18+70*T.MathUtils.smoothstep(distance,.003,.06);
+    limb.filteredGrip.lerp(gripPoint,initialize?1:-Math.expm1(-rate*dt));
+    limb.filteredRotation.slerp(gripRotation,initialize?1:-Math.expm1(-(20+65*T.MathUtils.smoothstep(angle,.02,.3))*dt));
+    limb.missingTime=0;
+  }else{
+    limb.missingTime+=dt;
+  }
+  paw.visible=!!active && limb.missingTime<.15;
+  if(!paw.visible) return;
+  paw.quaternion.copy(limb.filteredRotation);
+  // Keep the grip in XR reference space. Enter cat space only for contact.
+  desiredLive.set(0,0,-.047).applyQuaternion(paw.quaternion).add(limb.filteredGrip);
+  previousLive.copy(initialize?desiredLive:paw.position);
+  for(const point of [previousLive,desiredLive]){
+    point.applyQuaternion(rig.quaternion).add(rig.position).sub(catWorldOrigin).applyQuaternion(catInverse);
+  }
+  constrainPaw(previousLive,desiredLive,previousLive);
+  paw.position.copy(previousLive).applyQuaternion(catToWorld).add(catWorldOrigin)
+    .sub(rig.position).applyQuaternion(rigInverse);
+}
 function posePaws(frame,reference,inputs,viewer,dt,t){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
   trackingToCat.setFromAxisAngle(up,rig.rotation.y).premultiply(catInverse);
@@ -67482,16 +67519,18 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
     const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):vrShoulder.copy(limb.shoulder);
     followSpine(shoulder);
     const input=inputs.find(source=>source.handedness===limb.hand);
-    let tracked=null;
+    let tracked=null, wristJointPose=null;
     if(frame && reference && input && viewer){
       const handJoint=input.hand?.get('wrist');
-      if(handJoint && frame.getJointPose)tracked=frame.getJointPose(handJoint,reference);
+      if(handJoint && frame.getJointPose)tracked=wristJointPose=frame.getJointPose(handJoint,reference);
       const grip=input.gripSpace??(input.targetRayMode==='tracked-pointer'?input.targetRaySpace:null);
       if(!tracked && grip)tracked=frame.getPose(grip,reference);
     }
     const wasTracked=limb.tracked;
     limb.tracked=!!tracked;
-    limb.livePaw.visible=limb.tracked;
+    // A hand joint and a fallback grip have different origins. Hold the wrist
+    // through brief joint dropouts instead of switching between them.
+    livePawPose(limb,input?.hand && !wristJointPose?null:tracked,frame,dt);
     handTarget.copy(limb.rest);
     wrist.identity();
     if(tracked){
@@ -67528,12 +67567,7 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
     armWrist.copy(limb.paw.position);
     if(tracked)armWrist.add(armDirection.set(0,0,.025).applyQuaternion(limb.paw.quaternion));
     shapeForeleg(limb.foreleg,side,elbow,armWrist);
-    if(tracked){
-      // Display the same smoothed, collision-resolved pose in tracking space.
-      limb.livePaw.quaternion.copy(limb.paw.quaternion).premultiply(catToTracking);
-      limb.livePaw.position.copy(limb.paw.position).applyQuaternion(catToWorld)
-        .add(catWorldOrigin).sub(rig.position).applyQuaternion(rigInverse);
-    }
+
   }
 }
 const headInverse=new T.Quaternion();
