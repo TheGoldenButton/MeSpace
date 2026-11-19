@@ -66523,7 +66523,13 @@ for(const s of [-1,1]){
   for(let i=-1;i<=1;i++) oval(paw,lavender,i*.043,-.014,-.065,.025,.029,.038);
   oval(paw,innerEar,0,-.061,.012,.043,.012,.043);
   for(let i=-1;i<=1;i++) oval(paw,innerEar,i*.039,-.038,-.072,.014,.011,.017);
-  paws.push({hand:s<0?'left':'right',shoulder,rest,arm,forearm,paw});
+  // Clone before stencil materials are applied to the mirror avatar.
+  const livePaw=paw.clone(true);
+  livePaw.name=s<0?'Tracked left paw':'Tracked right paw';
+  livePaw.scale.setScalar(.85);
+  livePaw.visible=false;
+  rig.add(livePaw);
+  paws.push({hand:s<0?'left':'right',shoulder,rest,arm,forearm,paw,livePaw});
 
 }
 const tailPath = new T.CatmullRomCurve3([[.19,.13,.12],[.36,.13,.20],[.49,.21,.05],[.51,.35,-.10],[.43,.46,-.20],[.34,.45,-.235]].map(p=>new T.Vector3(...p)));
@@ -67159,6 +67165,9 @@ const forward=new T.Vector3();
 const sideStep=new T.Vector3();
 const handTarget=new T.Vector3();
 const wrist=new T.Quaternion();
+const trackingToCat=new T.Quaternion(), catToTracking=new T.Quaternion();
+const eyeAnchor=new T.Vector3();
+const pawAngles=new T.Euler(0,0,0,'YXZ');
 const armDirection=new T.Vector3();
 const catInverse=new T.Quaternion();
 let lastMs=null;
@@ -67184,14 +67193,18 @@ function fitArm(segment,start,end,overlap){
   segment.quaternion.setFromUnitVectors(up,armDirection.normalize());
 }
 const vrShoulder=new T.Vector3();
-// A common tangent plane keeps both straight arm segments outside the chest.
-function clearChest(point,side,limit){
-  const correction=Math.max(0,limit-(side*.6*point.x-.8*point.z));
-  point.x+=side*.6*correction;
-  point.z-=.8*correction;
+const armWrist=new T.Vector3();
+function clearChest(point){
+  // Fade chest clearance out above the ribs so hands can reach the face.
+  const clearance=(1-T.MathUtils.smoothstep(point.y,.38,.54))
+    *Math.max(0,.40-Math.abs(point.x)*.62+point.z);
+  point.z-=clearance;
 }
-function posePaws(frame, reference, inputs, viewer, dt,t){
+function posePaws(frame,reference,inputs,viewer,dt,t){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
+  trackingToCat.setFromAxisAngle(up,rig.rotation.y).premultiply(catInverse);
+  catToTracking.copy(trackingToCat).invert();
+  eyeAnchor.set(0,eyeHeight,-.272).applyQuaternion(head.quaternion).add(head.position);
   const blend=1-Math.exp(-23*dt);
   for(const limb of paws){
     const side=Math.sign(limb.shoulder.x);
@@ -67199,28 +67212,26 @@ function posePaws(frame, reference, inputs, viewer, dt,t){
     followSpine(shoulder);
     const input=inputs.find(source=>source.handedness===limb.hand);
     let tracked=null;
-    if(frame && reference && input){
+    if(frame && reference && input && viewer){
       const handJoint=input.hand?.get('wrist');
       if(handJoint && frame.getJointPose)tracked=frame.getJointPose(handJoint,reference);
-      const space=input.gripSpace??input.targetRaySpace;
-      if(!tracked && space)tracked=frame.getPose(space,reference);
+      const grip=input.gripSpace??(input.targetRayMode==='tracked-pointer'?input.targetRaySpace:null);
+      if(!tracked && grip)tracked=frame.getPose(grip,reference);
     }
-    limb.tracked=!!(tracked && viewer);
+    const wasTracked=limb.tracked;
+    limb.tracked=!!tracked;
+    limb.livePaw.visible=limb.tracked;
     handTarget.copy(limb.rest);
     wrist.identity();
-    if(tracked && viewer){
-      const {position,orientation}=tracked.transform;
+    if(tracked){
+      const {position}=tracked.transform;
+      // Map the user's eye-to-hand displacement onto the avatar's face and body.
       handTarget.set(position.x-viewer.x,position.y-viewer.y,position.z-viewer.z)
-        .applyAxisAngle(up,rig.rotation.y).applyQuaternion(catInverse).multiplyScalar(.73);
-      handTarget.add(leanLocal);
-      handTarget.y+=.56;
-      handTarget.z-=.08;
-      handTarget.sub(shoulder).clampLength(.085,.54).add(shoulder);
-      handTarget.y=Math.max(.07,handTarget.y);
-      wrist.set(orientation.x,orientation.y,orientation.z,orientation.w)
-        .premultiply(poseQ.setFromAxisAngle(up,rig.rotation.y)).premultiply(catInverse);
-    }
-    if(!limb.tracked){
+        .applyQuaternion(trackingToCat).multiplyScalar(.73).add(eyeAnchor);
+      clearChest(handTarget);
+      handTarget.sub(shoulder).clampLength(0,.62).add(shoulder);
+      handTarget.y=Math.max(.065,handTarget.y);
+    }else{
       const phase=t*(side<0?.86:.72)+side*1.8;
       const lift=Math.pow(.5+.5*Math.sin(phase+.45*Math.sin(t*.37)),4);
       handTarget.y+=.055*lift+.006*Math.sin(t*1.68+side*.3);
@@ -67231,44 +67242,79 @@ function posePaws(frame, reference, inputs, viewer, dt,t){
       handTarget.z-=.036*brace;
       wrist.setFromAxisAngle(up,side*.18*lift);
     }
-    limb.paw.position.lerp(handTarget,blend);
-    if(frame)clearChest(limb.paw.position,side,.45);
-    limb.paw.quaternion.slerp(wrist,blend);
+    const smoothing=tracked&&!wasTracked?1:blend;
+    limb.paw.position.lerp(handTarget,smoothing);
     const elbow=armElbow.copy(shoulder).lerp(limb.paw.position,.48);
     const reach=armDirection.copy(limb.paw.position).sub(shoulder).length();
-    const fold=T.MathUtils.clamp(1-reach/.55,.06,1);
-    elbow.x+=Math.sign(shoulder.x)*.049*fold;
-    elbow.z+=.125*fold;
-    if(frame)clearChest(elbow,side,.41);
+    const fold=T.MathUtils.clamp(1-reach/(frame?.62:.55),.06,1);
+    elbow.x+=side*(frame?.059:.049)*fold;
+    elbow.y-=frame?.071*fold:0;
+    elbow.z+=(frame?.105:.125)*fold;
+    if(frame)clearChest(elbow);
+    if(tracked){
+      // The model's toes point down local -Z. Follow the forearm with limited
+      // pitch and yaw, and keep the pads underneath regardless of grip roll.
+      armDirection.copy(limb.paw.position).sub(elbow);
+      const depth=Math.max(.085,-armDirection.z);
+      pawAngles.set(
+        T.MathUtils.clamp(Math.atan2(armDirection.y,Math.hypot(armDirection.x,depth)),-.60,.63),
+        T.MathUtils.clamp(Math.atan2(-armDirection.x,depth),-.85,.85),
+        0
+      );
+      wrist.setFromEuler(pawAngles);
+    }
+    limb.paw.quaternion.slerp(wrist,smoothing);
+    armWrist.copy(limb.paw.position);
+    if(tracked)armWrist.add(armDirection.set(0,0,.061).applyQuaternion(limb.paw.quaternion));
     fitArm(limb.arm,shoulder,elbow,.061);
-    fitArm(limb.forearm,elbow,limb.paw.position,.041);
+    fitArm(limb.forearm,elbow,armWrist,.041);
+    if(tracked){
+      // Render at the real tracked position in XR reference space. The rig
+      // supplies the same turning and flying transform as the headset camera.
+      const {position}=tracked.transform;
+      limb.livePaw.quaternion.copy(limb.paw.quaternion).premultiply(catToTracking);
+      limb.livePaw.position.set(0,0,-.047).applyQuaternion(limb.livePaw.quaternion)
+        .add(armWrist.set(position.x,position.y,position.z));
+    }
   }
 }
 const headInverse=new T.Quaternion();
-const contactCenter=new T.Vector3();
+const pawContacts=paws.map(limb=>({
+  limb,
+  samples:[{center:new T.Vector3(),radius:.113},{center:new T.Vector3(),radius:.094}]
+}));
 const contactOffset=new T.Vector3();
 const touchForce=new T.Vector3();
 const strongest=new T.Vector3();
-function flexWhiskers(dt){
+function flexWhiskers(dt,t){
   headInverse.copy(head.quaternion).invert();
-  for(const whisker of whiskers){
+  for(const {limb,samples:[{center:palm},{center:toes}]} of pawContacts){
+    if(!limb.tracked)continue;
+    palm.copy(limb.paw.position).sub(head.position).applyQuaternion(headInverse);
+    toes.set(0,-.01,-.081).applyQuaternion(limb.paw.quaternion)
+      .add(limb.paw.position).sub(head.position).applyQuaternion(headInverse);
+  }
+  for(const [index,whisker] of whiskers.entries()){
     strongest.set(0,0,0);
     let overlap=0;
-    for(const limb of paws){
+    for(const {limb,samples} of pawContacts){
       if(!limb.tracked)continue;
-      contactCenter.set(0,0,-.023).applyQuaternion(limb.paw.quaternion)
-        .add(limb.paw.position).sub(head.position).applyQuaternion(headInverse);
       for(let row=2;row<=12;row++){
         const u=row/12;
-        contactOffset.copy(whisker.centers[row]).add(whisker.pad.position).add(upperMuzzle.position).addScaledVector(whisker.bend,u*u).sub(contactCenter);
-        const distance=contactOffset.length();
-        const penetration=(.092-distance)*(.4+.6*u);
-        if(penetration<=overlap)continue;
-        overlap=penetration;
-        if(distance<.001)contactOffset.set(0,0,-1);
-        strongest.copy(contactOffset).normalize().multiplyScalar(penetration*1.8);
+        for(const {center,radius} of samples){
+          contactOffset.copy(whisker.centers[row]).add(whisker.pad.position)
+            .add(upperMuzzle.position).sub(center);
+          const distance=contactOffset.length();
+          const penetration=(radius-distance)*(.35+.65*u);
+          if(penetration<=overlap)continue;
+          overlap=penetration;
+          if(distance<.001)contactOffset.set(0,1,0);
+          strongest.copy(contactOffset).normalize().multiplyScalar(Math.min(.16,penetration*1.85));
+        }
       }
     }
+    strongest.y+=.0035*Math.sin(t*3.1+index*.85)+.008*mouthAmount;
+    strongest.z+=.003*Math.sin(t*2.2+index*.72);
     // Short integration steps keep the spring stable during headset frame drops.
     const steps=Math.max(1,Math.ceil(dt/.008));
     const h=dt/steps;
@@ -67379,7 +67425,7 @@ renderer.setAnimationLoop((ms,frame)=>{
   posePaws(frame,tracking,inputs,viewer,dt,t);
   speak(dt);
   twitchEars(t);
-  flexWhiskers(dt);
+  flexWhiskers(dt,t);
   const pulse=.5-.5*Math.cos(t*2*Math.PI/5);
   const lightHue=(.43+t/32+.28*mouthAmount+.04*spread)%1;
   mint.color.setHSL(lightHue,.83,.29);
