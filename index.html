@@ -66481,31 +66481,6 @@ const trunk=[
 function spineWeight(y){
   return T.MathUtils.clamp((y-.09)/.50,0,1);
 }
-for(const part of trunk){
-  const geo=part.geometry=part.geometry.clone();
-  const pos=geo.attributes.position;
-  geo.morphTargetsRelative=true;
-  geo.morphAttributes.position=[];
-  geo.morphAttributes.normal=[];
-  for(const axis of ['x','y','z']){
-    for(const upper of [false,true]){
-      const offsets=new Float32Array(pos.count*3);
-      const normals=new Float32Array(pos.count*3);
-      const component={x:0,y:1,z:2}[axis];
-      for(let i=0;i<pos.count;i++){
-        const y=part.position.y+pos.getY(i)*part.scale.y;
-        const w=spineWeight(y);
-        const weight=upper?w*w:w*(1-w);
-        offsets[i*3+component]=weight/part.scale[axis];
-        const slope=y>.09 && y<.59?(upper?2*w:1-2*w)/.50:0;
-        normals[i*3+1]=-geo.attributes.normal.array[i*3+component]*slope*part.scale.y/part.scale[axis];
-      }
-      geo.morphAttributes.position.push(new T.BufferAttribute(offsets,3));
-      geo.morphAttributes.normal.push(new T.BufferAttribute(normals,3));
-    }
-  }
-  part.updateMorphTargets();
-}
 const paws = [];
 for(const s of [-1,1]){
   const thigh=oval(cat,legFur,s*.202,.139,-.003,.153,.166,.195);
@@ -66543,23 +66518,27 @@ const tailCenters=Array.from({length:49},()=>new T.Vector3());
 const tailTangent=new T.Vector3(), tailSide=new T.Vector3(), tailNormal=new T.Vector3();
 const tailUp=new T.Vector3(0,1,0);
 function animateTail(t){
-  const swing=1.09*Math.sin(.76*t+.48*Math.sin(.31*t));
-  const curl=T.MathUtils.smoothstep(Math.abs(swing),.47,1.04);
-  // Lay the fixed base along the back of the pelvis. The mobile rings start
-  // beyond the rump and rise only after the tail clears the torso.
-  for(let row=0;row<=48;row++){
-    const u=row/48, flex=T.MathUtils.smoothstep(u,.21,.90);
-    const angle=swing+.34*Math.sin(1.84*t-3.8*u);
-    tailCenters[row].set(
-      .055*(1-u)+flex*.50*Math.sin(angle),
-      .216+.44*u*u+flex*.073*Math.sin(1.29*t-3*u),
-      .151+.51*(1-Math.pow(1-u,3))+flex*.081*Math.cos(angle));
-    // Clear the hips before curling forward alongside the cheek.
-    const outside=T.MathUtils.smoothstep(u,.12,.59);
-    const reach=T.MathUtils.smoothstep(u,.53,1);
-    const center=tailCenters[row];
-    center.x=T.MathUtils.lerp(center.x,.055*(1-u)+Math.sign(swing)*outside*(.65-.045*reach),curl);
-    center.z-=curl*.98*reach;
+  // Integrate equal-length links so the bend travels down the tail without stretching it.
+  const smooth=T.MathUtils.smoothstep;
+  const phase=.64*t+.77*Math.sin(.31*t)+.26*Math.sin(.83*t);
+  const flick=smooth(Math.sin(1.13*t+.7*Math.sin(.37*t)),.45,.95);
+  followSpine(tailCenters[0].set(.055,.216,.151));
+  for(let row=1;row<=48;row++){
+    const u=(row-.5)/48;
+    const wave=Math.sin(phase-.82*u);
+    const curl=smooth(Math.abs(wave),.48,.98);
+    const bend=smooth(u,.08,.77);
+    const tip=smooth(u,.55,1);
+    const yaw=wave*bend*(1.35+1.57*curl)
+      +bend*.22*Math.sin(1.49*t-5.8*u)
+      +tip*flick*.42*Math.sin(3.6*t-8*u)
+      +bend*.40*seatedLean.x;
+    const pitch=.12+.44*Math.sin(Math.PI*u)+.26*bend*Math.sin(.73*t-3.9*u)
+      +tip*(.36+.45*Math.sin(1.27*t-5*u))-.14*boostSpeed*bend;
+    const link=1.17/48, flat=link*Math.cos(pitch);
+    const previous=tailCenters[row-1];
+    tailCenters[row].set(previous.x+flat*Math.sin(yaw),
+      previous.y+link*Math.sin(pitch),previous.z+flat*Math.cos(yaw));
   }
   for(let row=0;row<=48;row++){
     const center=tailCenters[row],radius=.034+.034*(1-row/48);
@@ -66839,9 +66818,36 @@ function addGuardHairs(parent, name, center, radii, paint, count, seed, maskFace
   geometry.setAttribute('color',new T.Float32BufferAttribute(rgb,3));
   const fibers=mesh(parent,geometry,material(0xffffff,.82,0,{side:T.DoubleSide,vertexColors:true}),0,0,0);
   fibers.name=name;
+  return fibers;
 }
 addGuardHairs(head,'Head fur strands',[0,.132,0],[.366,.324,.297],faceFur.map,11600,23,true);
-addGuardHairs(cat,'Body fur strands',[0,.29,-.07],[.283,.341,.255],bodyFur.map,6900,98,false);
+trunk.push(addGuardHairs(cat,'Body fur strands',[0,.29,-.07],[.283,.341,.255],bodyFur.map,6900,98,false));
+
+for(const part of trunk){
+  const geo=part.geometry=part.geometry.clone();
+  const pos=geo.attributes.position;
+  geo.morphTargetsRelative=true;
+  geo.morphAttributes.position=[];
+  geo.morphAttributes.normal=[];
+  for(const axis of ['x','y','z']){
+    for(const upper of [false,true]){
+      const offsets=new Float32Array(pos.count*3);
+      const normals=new Float32Array(pos.count*3);
+      const component={x:0,y:1,z:2}[axis];
+      for(let i=0;i<pos.count;i++){
+        const y=part.position.y+pos.getY(i)*part.scale.y;
+        const w=spineWeight(y);
+        const weight=upper?w*w:w*(1-w);
+        offsets[i*3+component]=weight/part.scale[axis];
+        const slope=y>.09 && y<.59?(upper?2*w:1-2*w)/.50:0;
+        normals[i*3+1]=-geo.attributes.normal.array[i*3+component]*slope*part.scale.y/part.scale[axis];
+      }
+      geo.morphAttributes.position.push(new T.BufferAttribute(offsets,3));
+      geo.morphAttributes.normal.push(new T.BufferAttribute(normals,3));
+    }
+  }
+  part.updateMorphTargets();
+}
 
 faceFur.map.offset.x = .5;
 bodyFur.map.offset.x = .5;
