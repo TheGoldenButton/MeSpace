@@ -66640,25 +66640,34 @@ let mouthAmount=0, spread=0, floorNoise=.007, heldOpen=0;
 const AudioEngine=window.AudioContext??window.webkitAudioContext;
 micButton.disabled=!(AudioEngine && navigator.mediaDevices?.getUserMedia);
 if(micButton.disabled)micStatus.textContent='Microphone access requires a supported browser and an HTTPS page.';
+let micGeneration=0;
 function stopMicrophone(){
+  micGeneration++;
   micStream?.getTracks().forEach(track=>track.stop());
   if(audioContext && audioContext.state!=='closed')audioContext.close().catch(()=>{});
   micStream=audioContext=analyser=waveform=spectrum=null;
   micButton.textContent='Enable mic';
 }
 window.addEventListener('pagehide',stopMicrophone);
-micButton.addEventListener('click',async()=>{
+micButton.addEventListener('click',()=>{
   if(micStream){
     stopMicrophone();
     micStatus.textContent='Microphone is off.';
-    return;
-  }
+  }else startMicrophone();
+});
+async function startMicrophone(){
+  if(micButton.disabled || micStream)return;
+  const generation=++micGeneration;
   micButton.disabled=true;
   micStatus.textContent='Waiting for microphone permission…';
   try{
     audioContext=new AudioEngine();
-    await audioContext.resume();
-    micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+    const resumed=audioContext.resume().then(()=>true,()=>false);
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+    if(generation!==micGeneration){stream.getTracks().forEach(track=>track.stop());return;}
+    micStream=stream;
+    if(!await resumed)throw new Error("Audio unavailable");
+    if(generation!==micGeneration)return;
     const source=audioContext.createMediaStreamSource(micStream);
     analyser=audioContext.createAnalyser();
     analyser.fftSize=1024;
@@ -66674,12 +66683,13 @@ micButton.addEventListener('click',async()=>{
     micButton.textContent='Disable mic';
     micStatus.textContent='Mic is on. Speak to move the mouth.';
   }catch(error){
+    if(generation!==micGeneration)return;
     stopMicrophone();
     micStatus.textContent=error.name==='NotAllowedError'?'Microphone access was declined. Allow it in your browser to animate the mouth.':'Could not start the microphone. Check that your browser has access to it.';
   }finally{
     micButton.disabled=false;
   }
-});
+}
 function speak(dt){
   let drive=0, width=0;
   if(analyser){
@@ -66959,11 +66969,22 @@ async function detectXR(){
 }
 button.addEventListener('click',async()=>{
   button.disabled=true;
-  let session;
+  let session, vrMicGeneration;
+  function releaseVrMic(){
+    if(vrMicGeneration!==micGeneration)return;
+    stopMicrophone();
+    micStatus.textContent="Microphone is off.";
+  }
   try{
-    session=await navigator.xr.requestSession('immersive-vr',{requiredFeatures:['local-floor'],optionalFeatures:['hand-tracking']});
+    const requested=navigator.xr.requestSession('immersive-vr',{requiredFeatures:['local-floor'],optionalFeatures:['hand-tracking']});
+    if(!micStream && !micButton.disabled){
+      startMicrophone();
+      vrMicGeneration=micGeneration;
+    }else if(micStream)audioContext.resume().catch(()=>{});
+    session=await requested;
     anchored=false;velocity.set(0,0,0);
     session.addEventListener('end',()=>{
+      releaseVrMic();
       rig.position.set(0,0,0);rig.rotation.y=0;
       velocity.set(0,0,0);desktopCamera();
       panel.hidden=false;
@@ -66974,6 +66995,7 @@ button.addEventListener('click',async()=>{
     await renderer.xr.setSession(session);
     panel.hidden=true;
   }catch(error){
+    releaseVrMic();
     if(session)await session.end().catch(()=>{});
     status.textContent='VR could not start. '+error.message;
     button.disabled=!xrReady;panel.hidden=false;
@@ -67013,10 +67035,19 @@ function fitArm(segment,start,end,overlap){
   segment.scale.y=armDirection.length()*.5+overlap;
   segment.quaternion.setFromUnitVectors(up,armDirection.normalize());
 }
+const vrShoulder=new T.Vector3();
+// A common tangent plane keeps both straight arm segments outside the chest.
+function clearChest(point,side,limit){
+  const correction=Math.max(0,limit-(side*.6*point.x-.8*point.z));
+  point.x+=side*.6*correction;
+  point.z-=.8*correction;
+}
 function posePaws(frame, reference, inputs, viewer, dt){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).invert();
   const blend=1-Math.exp(-23*dt);
   for(const limb of paws){
+    const side=Math.sign(limb.shoulder.x);
+    const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):limb.shoulder;
     const input=inputs.find(source=>source.handedness===limb.hand);
     let tracked=null;
     if(frame && reference && input){
@@ -67035,19 +67066,21 @@ function posePaws(frame, reference, inputs, viewer, dt){
       handTarget.add(leanLocal);
       handTarget.y+=.56;
       handTarget.z-=.08;
-      handTarget.sub(limb.shoulder).clampLength(.085,.54).add(limb.shoulder);
+      handTarget.sub(shoulder).clampLength(.085,.54).add(shoulder);
       handTarget.y=Math.max(.07,handTarget.y);
       wrist.set(orientation.x,orientation.y,orientation.z,orientation.w)
         .premultiply(poseQ.setFromAxisAngle(up,rig.rotation.y)).premultiply(catInverse);
     }
     limb.paw.position.lerp(handTarget,blend);
+    if(frame)clearChest(limb.paw.position,side,.45);
     limb.paw.quaternion.slerp(wrist,blend);
-    const elbow=armElbow.copy(limb.shoulder).lerp(limb.paw.position,.48);
-    const reach=armDirection.copy(limb.paw.position).sub(limb.shoulder).length();
+    const elbow=armElbow.copy(shoulder).lerp(limb.paw.position,.48);
+    const reach=armDirection.copy(limb.paw.position).sub(shoulder).length();
     const fold=T.MathUtils.clamp(1-reach/.55,.06,1);
-    elbow.x+=Math.sign(limb.shoulder.x)*.049*fold;
+    elbow.x+=Math.sign(shoulder.x)*.049*fold;
     elbow.z+=.125*fold;
-    fitArm(limb.arm,limb.shoulder,elbow,.061);
+    if(frame)clearChest(elbow,side,.41);
+    fitArm(limb.arm,shoulder,elbow,.061);
     fitArm(limb.forearm,elbow,limb.paw.position,.041);
   }
 }
