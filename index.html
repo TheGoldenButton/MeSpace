@@ -66516,13 +66516,28 @@ trunk.push(addLightFur(cat,trunk[1],'Chest fur',2500,141,.73));
 function spineWeight(y){
   return T.MathUtils.clamp((y-.09)/.50,0,1);
 }
+// Wrap short toe creases over the front edge of each back foot.
+const toeSeam=material(0x693a76,.91);
+function addToeLines(parent,cx,cy,cz,rx,ry,rz){
+  for(const side of [-1,1]){
+    const points=[];
+    for(let i=0;i<=10;i++){
+      const angle=1.20+i*.066;
+      const x=side*(.25+.055*i/10);
+      const arc=Math.sqrt(1-x*x);
+      points.push([cx+rx*x,cy+ry*arc*Math.cos(angle),cz-rz*arc*Math.sin(angle)]);
+    }
+    tube(parent,toeSeam,points,rx*.027,14);
+  }
+}
 const paws = [];
 for(const s of [-1,1]){
   const thigh=oval(cat,legFur,s*.202,.139,-.003,.153,.166,.195);
   thigh.rotation.z=s*.20;
   oval(cat,purple,s*.243,.064,-.124,.125,.078,.144);
+  addToeLines(cat,s*.243,.064,-.124,.125,.078,.144);
   const shoulder = new T.Vector3(s*.146,.329,-.168);
-  const rest = new T.Vector3(s*.109,.067,-.286);
+  const rest = new T.Vector3(s*.109,.067,-.422);
   const foreleg=createForeleg(s);
   const paw = new T.Group();
   paw.name=s<0?'Left paw':'Right paw';
@@ -67409,6 +67424,7 @@ function slidePaw(point,target,blend,side){
     }
   }
 }
+const restWrist=new T.Quaternion();
 function posePaws(frame,reference,inputs,viewer,dt,t){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
   trackingToCat.setFromAxisAngle(up,rig.rotation.y).premultiply(catInverse);
@@ -67442,6 +67458,14 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
 
       handTarget.sub(shoulder).clampLength(0,.62).add(shoulder);
       handTarget.y=Math.max(.065,handTarget.y);
+      // A low wrist close to the seated pelvis settles onto the idle paw perch.
+      // Measure from the seat so nodding or leaning does not lift a resting paw.
+      const lapDepth=torsoTracker.y-position.y;
+      const lapRadius=Math.hypot(position.x-torsoTracker.x,position.z-torsoTracker.z);
+      const lap=T.MathUtils.smoothstep(lapDepth,.31,.49)
+        *(1-T.MathUtils.smoothstep(lapRadius,.40,.56));
+      handTarget.lerp(limb.rest,lap);
+      wrist.slerp(restWrist,lap);
     }else{
       const phase=t*(side<0?.86:.72)+side*1.8;
       const lift=Math.pow(.5+.5*Math.sin(phase+.45*Math.sin(t*.37)),4);
@@ -67573,8 +67597,10 @@ renderer.setAnimationLoop((ms,frame)=>{
       rig.position.sub(before.sub(nextViewer));
       previousViewer.copy(nextViewer);
       x=nextViewer.x;z=nextViewer.z;
-      torsoTracker.lerp(leanWorld.set(position.x,position.y,position.z),1-Math.exp(-2.2*dt));
-      leanWorld.sub(torsoTracker).clampLength(0,.19).applyAxisAngle(up,rig.rotation.y);
+      // Keep the seat anchored through a held lean. Larger room-scale steps carry it along.
+      leanWorld.set(position.x,position.y,position.z).sub(torsoTracker).clampLength(0,.24);
+      torsoTracker.set(position.x,position.y,position.z).sub(leanWorld);
+      leanWorld.applyAxisAngle(up,rig.rotation.y);
       avatarHeight=position.y+rig.position.y;
       yaw=Math.atan2(Math.sin(view.y+rig.rotation.y),Math.cos(view.y+rig.rotation.y));
       pitch=view.x;
@@ -67609,6 +67635,9 @@ renderer.setAnimationLoop((ms,frame)=>{
   neckLoad.lerp(ribLoad,1-Math.exp(-9*dt));
   lumbarOffset.set(seatedLean.x*.32+.013*shift,seatedLean.y*.12,seatedLean.z*.30);
   ribOffset.set(ribLoad.x*.36+.014*shift,ribLoad.y*.19-.051*braceAmount+.007*breath-.07*Math.hypot(ribLoad.x,ribLoad.z),ribLoad.z*.39+.005*breath);
+  leanLocal.copy(leanWorld).applyQuaternion(catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert());
+  lumbarOffset.addScaledVector(leanLocal,.39);
+  ribOffset.addScaledVector(leanLocal,.78);
   for(const part of trunk){
     const weights=part.morphTargetInfluences;
     weights[0]=lumbarOffset.x; weights[1]=ribOffset.x;
@@ -67616,8 +67645,7 @@ renderer.setAnimationLoop((ms,frame)=>{
     weights[4]=lumbarOffset.z; weights[5]=ribOffset.z;
   }
   head.rotation.set(pitch+.30*(neckLoad.z-ribLoad.z),neckYaw,roll-.32*(neckLoad.x-ribLoad.x),'YXZ');
-  leanLocal.copy(leanWorld).applyQuaternion(catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert());
-  followSpine(head.position.set(0,.584,-.096)).add(leanLocal)
+  followSpine(head.position.set(0,.584,-.096)).addScaledVector(leanLocal,.23)
     .addScaledVector(neckLoad,.18).addScaledVector(ribLoad,-.18);
   if(viewer){
     // Express the tracked world orientation in the animated neck parent’s frame.
