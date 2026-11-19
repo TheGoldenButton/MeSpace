@@ -67410,7 +67410,6 @@ function updatePawColliders(){
 const sweepStart=new T.Vector3(), sweepDelta=new T.Vector3(), collisionNormal=new T.Vector3();
 const pawDestination=new T.Vector3(), pawRemaining=new T.Vector3();
 const front=new T.Vector3(0,0,-1);
-const pawHit=new T.Vector3(), pawFrom=new T.Vector3(), pawTo=new T.Vector3();
 function normalizedPawPoint(point,collider,result){
   return result.copy(point).sub(collider.center).applyQuaternion(collider.inverse).divide(collider.size);
 }
@@ -67467,7 +67466,6 @@ function constrainPaw(previous,desired,result){
 }
 const catWorldOrigin=new T.Vector3();
 const catToWorld=new T.Quaternion(), rigInverse=new T.Quaternion();
-const livePawTarget=new T.Vector3();
 function posePaws(frame,reference,inputs,viewer,dt,t){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
   trackingToCat.setFromAxisAngle(up,rig.rotation.y).premultiply(catInverse);
@@ -67531,23 +67529,10 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
     if(tracked)armWrist.add(armDirection.set(0,0,.025).applyQuaternion(limb.paw.quaternion));
     shapeForeleg(limb.foreleg,side,elbow,armWrist);
     if(tracked){
-      const {position}=tracked.transform;
+      // Display the same smoothed, collision-resolved pose in tracking space.
       limb.livePaw.quaternion.copy(limb.paw.quaternion).premultiply(catToTracking);
-      livePawTarget.set(0,0,-.047).applyQuaternion(limb.livePaw.quaternion)
-        .add(armWrist.set(position.x,position.y,position.z));
-      // Resolve the first-person paw against the unreflected avatar, then
-      // convert it back to XR tracking space for rendering.
-      pawTo.copy(livePawTarget).applyQuaternion(rig.quaternion).add(rig.position)
-        .sub(catWorldOrigin).applyQuaternion(catInverse);
-      if(wasTracked){
-        pawFrom.copy(limb.livePaw.position).applyQuaternion(rig.quaternion).add(rig.position)
-          .sub(catWorldOrigin).applyQuaternion(catInverse);
-      }else{
-        pawFrom.copy(pawTo);
-      }
-      constrainPaw(pawFrom,pawTo,pawHit);
-      limb.livePaw.position.copy(pawHit).applyQuaternion(catToWorld).add(catWorldOrigin)
-        .sub(rig.position).applyQuaternion(rigInverse);
+      limb.livePaw.position.copy(limb.paw.position).applyQuaternion(catToWorld)
+        .add(catWorldOrigin).sub(rig.position).applyQuaternion(rigInverse);
     }
   }
 }
