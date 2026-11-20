@@ -66556,6 +66556,7 @@ const paws = [];
 for(const s of [-1,1]){
   const thigh=oval(cat,legFur,s*.202,.139,-.003,.153,.166,.195);
   thigh.rotation.z=s*.20;
+  addGuardHairs(cat,'Hind foot fur',[s*.243,.064,-.124],[.125,.078,.144],purple.color,2300,451+s,false,.53);
   oval(cat,purple,s*.243,.064,-.124,.125,.078,.144);
   addToeLines(cat,s*.243,.064,-.124,.125,.078,.144);
   const shoulder = new T.Vector3(s*.146,.329,-.168);
@@ -66566,10 +66567,10 @@ for(const s of [-1,1]){
   paw.position.copy(rest);
   cat.add(paw);
   const palm=oval(paw,lightFur,0,0,0,.082,.065,.099);
-  addLightFur(paw,palm,'Palm fur',740,120+s,.39);
+  addLightFur(paw,palm,'Palm fur',1250,120+s,.48);
   for(let i=-1;i<=1;i++){
     const toe=oval(paw,lightFur,i*.043,-.014,-.065,.025,.029,.038);
-    addLightFur(paw,toe,'Toe fur',145,130+s*4+i,.26);
+    addLightFur(paw,toe,'Toe fur',220,130+s*4+i,.32);
   }
   oval(paw,innerEar,0,-.061,.012,.043,.012,.043);
   for(let i=-1;i<=1;i++) oval(paw,innerEar,i*.039,-.038,-.072,.014,.011,.017);
@@ -66598,6 +66599,37 @@ const tailTip=oval(cat,green,0,0,0,.034,.034,.034);
 const tailCenters=Array.from({length:49},()=>new T.Vector3());
 const tailTangent=new T.Vector3(), tailSide=new T.Vector3(), tailNormal=new T.Vector3();
 const tailUp=new T.Vector3(0,1,0);
+// Store each band of fur in its moving tail segment's local frame.
+const tailRand=rng(217);
+const tailLocks=[], tailShades=[], tailFacing=[];
+const hairsPerBand=85;
+for(let row=0;row<48;row++){
+  for(let h=0;h<hairsPerBand;h++){
+    const along=tailRand(), angle=tailRand()*Math.PI*2;
+    const radius=.034+.034*(1-(row+along)/48);
+    const x=Math.cos(angle), y=Math.sin(angle);
+    const width=.0009+.0008*tailRand(), length=.015+.016*tailRand();
+    const shade=new T.Color().fromArray(tailColors,row*13*3)
+      .lerp(new T.Color().fromArray(tailColors,(row+1)*13*3),along)
+      .multiplyScalar(.68+.75*tailRand());
+    for(const edge of [-1,1,0]){
+      const lift=edge===0?length*.65:0;
+      tailLocks.push(x*(radius+lift)-edge*y*width,y*(radius+lift)+edge*x*width,
+        along*1.17/48+(edge===0?length:0));
+      tailFacing.push(x,y);
+      tailShades.push(shade.r,shade.g,shade.b);
+    }
+  }
+}
+const tailCoatGeo=new T.BufferGeometry();
+const hairP=new T.Float32BufferAttribute(new Float32Array(tailLocks.length),3);
+const hairN=new T.Float32BufferAttribute(new Float32Array(tailLocks.length),3);
+tailCoatGeo.setAttribute('position',hairP);
+tailCoatGeo.setAttribute('normal',hairN);
+tailCoatGeo.setAttribute('color',new T.Float32BufferAttribute(tailShades,3));
+const tailCoat=mesh(cat,tailCoatGeo,material(0xffffff,.84,0,{vertexColors:true,side:T.DoubleSide}),0,0,0);
+tailCoat.frustumCulled=false;
+const tipFur=addGuardHairs(cat,'Tail tip fur',[0,0,0],[.034,.034,.034],green.color,450,218,false,.60);
 function animateTail(t){
   // Integrate equal-length links so the bend travels down the tail without stretching it.
   const smooth=T.MathUtils.smoothstep;
@@ -66626,12 +66658,25 @@ function animateTail(t){
     tailTangent.subVectors(tailCenters[Math.min(48,row+1)],tailCenters[Math.max(0,row-1)]).normalize();
     tailSide.crossVectors(tailUp,tailTangent).normalize();
     tailNormal.crossVectors(tailTangent,tailSide);
+    if(row<48){
+      const start=row*hairsPerBand*3;
+      for(let i=start;i<start+hairsPerBand*3;i++){
+        const x=tailLocks[i*3], y=tailLocks[i*3+1], z=tailLocks[i*3+2];
+        hairP.setXYZ(i,center.x+x*tailSide.x+y*tailNormal.x+z*tailTangent.x,
+          center.y+x*tailSide.y+y*tailNormal.y+z*tailTangent.y,
+          center.z+x*tailSide.z+y*tailNormal.z+z*tailTangent.z);
+        const nx=tailFacing[i*2],ny=tailFacing[i*2+1];
+        hairN.setXYZ(i,nx*tailSide.x+ny*tailNormal.x,nx*tailSide.y+ny*tailNormal.y,nx*tailSide.z+ny*tailNormal.z);
+      }
+    }
     for(let j=0;j<=12;j++){
       const angle=j*Math.PI/6, a=-radius*Math.cos(angle), b=radius*Math.sin(angle);
       tailP.setXYZ(row*13+j,center.x+a*tailSide.x+b*tailNormal.x,
         center.y+a*tailSide.y+b*tailNormal.y,center.z+a*tailSide.z+b*tailNormal.z);
     }
   }
+  hairP.needsUpdate=hairN.needsUpdate=true;
+  tipFur.position.copy(tailCenters[48]);
   tailTip.position.copy(tailCenters[48]);
   tailP.needsUpdate=true;
   tailGeo.computeVertexNormals();
@@ -66721,6 +66766,57 @@ function ear(parent,side) {
   tuftGeo.computeVertexNormals();
   const tuftMaterial=material(0xdfb1ee,.86,0,{side:T.DoubleSide});
   mesh(parent,tuftGeo,tuftMaterial,0,0,0).scale.x=side;
+
+  const rand=rng(5201+side);
+  const fibers=[], shades=[], fiberNormals=[];
+  function groom(surface,baseColor,density,length,front){
+    const attr=surface.attributes;
+    const a=new T.Vector3(), b=new T.Vector3(), c=new T.Vector3();
+    const root=new T.Vector3(), normal=new T.Vector3(), width=new T.Vector3();
+    const tint=new T.Color(), sample=new T.Color();
+    const end=surface.index?.count ?? attr.position.count;
+    for(let i=surface.drawRange.start;i<end;i+=3){
+      const ids=[i,i+1,i+2].map(j=>surface.index?surface.index.getX(j):j);
+      a.fromBufferAttribute(attr.position,ids[0]);
+      b.fromBufferAttribute(attr.position,ids[1]).sub(a);
+      c.fromBufferAttribute(attr.position,ids[2]).sub(a);
+      normal.crossVectors(b,c);
+      const count=Math.floor(normal.length()*.5*density+rand());
+      normal.normalize();
+      if(front && normal.z>0)normal.negate();
+      for(let j=0;j<count;j++){
+        const r=Math.sqrt(rand()), u=r*rand(), v=r-u;
+        root.copy(a).addScaledVector(b,u).addScaledVector(c,v).addScaledVector(normal,.0004);
+        const hair=new T.Vector3((.075-root.x)*2+(rand()-.5)*.5,.85,front?-.18:.12);
+        hair.addScaledVector(normal,-hair.dot(normal)).normalize();
+        width.crossVectors(hair,normal).normalize().multiplyScalar(.00065+rand()*.0007);
+        hair.addScaledVector(normal,.43+rand()*.35).multiplyScalar(length*(.55+rand()*.85));
+        fibers.push(root.x-width.x,root.y-width.y,root.z-width.z,
+          root.x+width.x,root.y+width.y,root.z+width.z,root.x+hair.x,root.y+hair.y,root.z+hair.z);
+        tint.copy(baseColor);
+        if(attr.color){
+          tint.setRGB(0,0,0);
+          for(const [n,weight] of [1-r,u,v].entries()){
+            sample.fromBufferAttribute(attr.color,ids[n]).multiplyScalar(weight);
+            tint.add(sample);
+          }
+        }
+        tint.multiplyScalar(.66+rand()*.85);
+        for(let n=0;n<3;n++){
+          shades.push(tint.r,tint.g,tint.b);
+          fiberNormals.push(normal.x,normal.y,normal.z);
+        }
+      }
+    }
+  }
+  groom(shellGeo,purple.color,42000,.016,false);
+  groom(cupGeo,lilac,38000,.010,true);
+  groom(tuftGeo,tuftMaterial.color,64000,.015,true);
+  const coatGeo=new T.BufferGeometry();
+  coatGeo.setAttribute('position',new T.Float32BufferAttribute(fibers,3));
+  coatGeo.setAttribute('color',new T.Float32BufferAttribute(shades,3));
+  coatGeo.setAttribute('normal',new T.Float32BufferAttribute(fiberNormals,3));
+  mesh(parent,coatGeo,material(0xffffff,.84,0,{side:T.DoubleSide,vertexColors:true}),0,0,0).scale.x=side;
 }
 const irisMaps = [], eyes=[];
 const eyeHeight=.211, eyeScaleY=.9964;
@@ -66937,11 +67033,11 @@ function addLightFur(parent,surface,name,count,seed,strandScale){
 function addGuardHairs(parent,name,center,radii,paint,count,seed,maskFace,strandScale=1){
   const rand=rng(seed);
   const image=paint.image;
-  if(!furPixels.has(image)){
+  if(image && !furPixels.has(image)){
     furPixels.set(image,image.getContext('2d').getImageData(0,0,image.width,image.height).data);
   }
   const colors=furPixels.get(image);
-  const lightPatch=paint===lightFur.map;
+  const lightPatch=paint.isColor || paint===lightFur.map;
   const positions=[], normals=[], rgb=[];
   const normal=new T.Vector3(), anchor=new T.Vector3(), sweep=new T.Vector3(), side=new T.Vector3();
   const color=new T.Color();
@@ -66966,9 +67062,12 @@ function addGuardHairs(parent,name,center,radii,paint,count,seed,maskFace,strand
     const length=(.010+rand()*.020)*strandScale
       *(lightPatch?1:maskFace?(.76+.95*cheek-.32*front):(1-.68*bib));
     const width=(.0008+rand()*.0010)*Math.sqrt(strandScale);
-    const u=(phi/(2*Math.PI)+.5)%1;
-    const j=(Math.min(image.height-1,Math.floor(theta/Math.PI*image.height))*image.width+Math.floor(u*image.width))*4;
-    color.setRGB(colors[j]/255,colors[j+1]/255,colors[j+2]/255,T.SRGBColorSpace);
+    if(paint.isColor)color.copy(paint);
+    else{
+      const u=(phi/(2*Math.PI)+.5)%1;
+      const j=(Math.min(image.height-1,Math.floor(theta/Math.PI*image.height))*image.width+Math.floor(u*image.width))*4;
+      color.setRGB(colors[j]/255,colors[j+1]/255,colors[j+2]/255,T.SRGBColorSpace);
+    }
     color.multiplyScalar(.63+rand()*.56);
     for(const edge of [-1,1]){
       positions.push(anchor.x+side.x*edge*width,anchor.y+side.y*edge*width,anchor.z+side.z*edge*width);
