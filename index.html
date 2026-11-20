@@ -66345,6 +66345,28 @@ function fur(kind) {
         backStripe(y+15,spans[i],37,38);
         stripe(570,y,400,21,48);
       });
+      // Continue the chest bib along the torso and around the seated pelvis.
+      ctx.save();
+      ctx.filter="blur(2px)";
+      const belly=ctx.createLinearGradient(0,h*.18,0,h);
+      belly.addColorStop(0,'#e7bbf7');
+      belly.addColorStop(.48,'#d9a1ef');
+      belly.addColorStop(1,'#c486e4');
+      ctx.fillStyle=belly;
+      for(const wrap of [-1,0,1]){
+        const center=w*(.25+wrap);
+        ctx.beginPath();
+        ctx.moveTo(center,h*.18);
+        ctx.bezierCurveTo(center+w*.115,h*.20,center+w*.106,h*.46,center+w*.094,h*.69);
+        ctx.bezierCurveTo(center+w*.093,h*.81,center+w*.16,h*.90,center+w*.50,h*.99);
+        ctx.lineTo(center+w*.50,h);
+        ctx.lineTo(center-w*.50,h);
+        ctx.lineTo(center-w*.50,h*.99);
+        ctx.bezierCurveTo(center-w*.16,h*.90,center-w*.093,h*.81,center-w*.094,h*.69);
+        ctx.bezierCurveTo(center-w*.106,h*.46,center-w*.115,h*.20,center,h*.18);
+        ctx.fill();
+      }
+      ctx.restore();
     }
     const rand=rng(kind==='head'?12:41);
     for(let i=0;i<65000;i++){
@@ -66512,13 +66534,7 @@ const cat = new T.Group();
 cat.name='Conscious Kitty';
 cat.position.y=.30;
 ufo.add(cat);
-const trunk=[
-  oval(cat,bodyFur,0,.29,-.07,.283,.341,.255),
-  oval(cat,lightFur,0,.328,-.278,.157,.232,.059)
-];
-trunk.push(addLightFur(cat,trunk[1],'Chest fur',2500,141,.73));
-// Bend from the seated pelvis through the ribs. Both fur surfaces use
-// identical weights at the same height so the belly marking stays attached.
+const trunk=[oval(cat,bodyFur,0,.29,-.07,.283,.341,.255)];
 function spineWeight(y){
   return T.MathUtils.clamp((y-.09)/.50,0,1);
 }
