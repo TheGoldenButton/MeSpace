@@ -66501,6 +66501,32 @@ oval(ufo,darkMetal,0,.276,0,.385,.057,.385);
 ring(ufo,darkMetal,.735,.01,.034);ring(ufo,mint,.745,.035,.011);
 ring(ufo,orchid,.47,.217,.012);ring(ufo,mint,.26,-.245,.019);
 oval(ufo,mint,0,-.246,0,.17,.027,.17);
+// Follow the sloping upper hull with a continuous oscilloscope display.
+const scopeMap=texture(1024,96,()=>{});
+const scopeCtx=scopeMap.image.getContext('2d');
+const scopeProfile=[[.48,.178],[.58,.155],[.70,.095]];
+const scopeBand=new T.LatheGeometry(scopeProfile.map(([r,y])=>new T.Vector2(r,y)),128);
+mesh(ufo,scopeBand,new T.MeshBasicMaterial({map:scopeMap,side:T.DoubleSide,toneMapped:false}),0,0,0);
+let scopeWasActive=true;
+function drawScope(samples){
+  if(!samples && !scopeWasActive)return;
+  scopeWasActive=!!samples;
+  const ctx=scopeCtx, {width,height}=scopeMap.image;
+  ctx.fillStyle='#21132e';
+  ctx.fillRect(0,0,width,height);
+  ctx.beginPath();
+  // Repeat the trace around the rim so it can be read from any seat angle.
+  for(let x=0;x<=width;x++){
+    const phase=(x%256)/256;
+    const sample=samples?samples[Math.floor(phase*samples.length)]:0;
+    const taper=Math.min(1,phase*32,(1-phase)*32);
+    const y=height*(.5-.42*Math.tanh(sample*5)*taper);
+    if(x===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle='#438359';ctx.lineWidth=6;ctx.stroke();
+  ctx.strokeStyle='#bcff96';ctx.lineWidth=2.5;ctx.stroke();
+  scopeMap.needsUpdate=true;
+}
 const rimGlowMap=texture(64,64,(ctx,w,h)=>{
   const glow=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
   glow.addColorStop(0,'#ffffff');
@@ -67926,6 +67952,7 @@ renderer.setAnimationLoop((ms,frame)=>{
   }
   animateTail(t);
   speak(dt);
+  drawScope(analyser?waveform:null);
   posePaws(frame,tracking,inputs,viewer,dt,t);
   twitchEars(t);
   flexWhiskers(dt,t);
