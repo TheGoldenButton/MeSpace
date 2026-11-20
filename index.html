@@ -66829,7 +66829,7 @@ const spiralTexture=texture(512,512,ctx=>{
       const r=i*.8, a=r*.028+arm*Math.PI;
       ctx.lineTo(r*Math.cos(a),r*Math.sin(a));
     }
-    ctx.strokeStyle=arm?'#fb8cff':'#94fff4';
+    ctx.strokeStyle=arm?'#8b3aca':'#78d452';
     ctx.lineWidth=22;
     ctx.stroke();
   }
@@ -67239,7 +67239,7 @@ glass.renderOrder=8;
 
 const emitters=new T.Group();
 ufo.add(emitters);
-const laserMaterial=new T.MeshBasicMaterial({color:0x89fffa,toneMapped:false});
+const laserMaterial=new T.MeshBasicMaterial({color:0xff1828,toneMapped:false});
 for(const side of [-1,1]){
   const barrel=oval(emitters,darkMetal,side*.34,.05,-.64,.058,.056,.19);
   oval(emitters,laserMaterial,barrel.position.x,.05,-.817,.038,.038,.028);
@@ -67290,13 +67290,18 @@ let eyeCharge=0, heldTime=0, firing=false, beamVoice=null;
 function laserVoice(sustain){
   if(!engine)return;
   const now=engine.currentTime, voice=engine.createOscillator(), level=engine.createGain();
-  voice.type=sustain?'sawtooth':'triangle';
-  voice.frequency.setValueAtTime(sustain?125:1250,now);
-  voice.frequency.exponentialRampToValueAtTime(sustain?170:115,now+(sustain?.2:.15));
+  voice.type=sustain?'triangle':'sine';
+  voice.frequency.setValueAtTime(sustain?110:760,now);
+  voice.frequency.exponentialRampToValueAtTime(sustain?125:185,now+(sustain?.2:.15));
   level.gain.setValueAtTime(.0001,now);
-  level.gain.exponentialRampToValueAtTime(sustain?.038:.16,now+.012);
+  level.gain.exponentialRampToValueAtTime(sustain?.022:.068,now+.012);
+  const modulator=engine.createOscillator(), depth=engine.createGain();
+  modulator.frequency.value=sustain?60:95;
+  depth.gain.value=sustain?13:65;
+  modulator.connect(depth).connect(voice.frequency);
+  modulator.start(now);
   voice.connect(level).connect(engine.destination);
-  voice.onended=()=>{voice.disconnect();level.disconnect();};
+  voice.onended=()=>{modulator.stop();modulator.disconnect();depth.disconnect();voice.disconnect();level.disconnect();};
   voice.start();
   if(sustain)beamVoice={voice,level};
   else{
@@ -67491,7 +67496,7 @@ async function detectXR(){
   try{xrReady=!!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr'));}
   catch{xrReady=false;}
   button.disabled=!xrReady;
-  status.textContent=xrReady?'Select Enter VR in your headset. Hold right A to boost, left trigger for spiral eyes, and tap or hold right trigger to fire.':previewHelp+' · VR requires a WebXR headset browser.';
+  status.textContent=xrReady?'Select Enter VR in your headset. Hold the left stick in to boost, hold B for spiral eyes, and tap or hold right trigger to fire.':previewHelp+' · VR requires a WebXR headset browser.';
 }
 button.addEventListener('click',async()=>{
   button.disabled=true;
@@ -67515,7 +67520,7 @@ button.addEventListener('click',async()=>{
       velocity.set(0,0,0);desktopCamera();
       panel.hidden=false;
       button.disabled=!xrReady;
-      status.textContent='Select Enter VR in your headset. Hold right A to boost, left trigger for spiral eyes, and tap or hold right trigger to fire.';
+      status.textContent='Select Enter VR in your headset. Hold the left stick in to boost, hold B for spiral eyes, and tap or hold right trigger to fire.';
     },{once:true});
     renderer.xr.setFramebufferScaleFactor(.91);
     await renderer.xr.setSession(session);
@@ -67808,8 +67813,7 @@ function flexWhiskers(dt,t){
     positions.needsUpdate=true;
   }
 }
-const boostRed=new T.Color(0xff1010);
-let boostFade=0;
+let lightPhase=.43;
 renderer.setAnimationLoop((ms,frame)=>{
   const t=ms*.001;
   const dt=lastMs===null?1/60:T.MathUtils.clamp((ms-lastMs)*.001,0,.05);
@@ -67844,7 +67848,7 @@ renderer.setAnimationLoop((ms,frame)=>{
         rig.position.add(rotatedHead);
       }
       const [strafe,walk]=stick(inputs.find(input=>input.handedness==='left')?.gamepad);
-      boosting=inputs.find(i=>i.handedness==='right')?.gamepad?.buttons[4]?.pressed;
+      boosting=inputs.find(i=>i.handedness==='left')?.gamepad?.buttons[3]?.pressed;
       fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,boosting,dt);
       rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
       nextViewer.set(rotatedHead.x,position.y+rig.position.y,rotatedHead.z);
@@ -67911,10 +67915,10 @@ renderer.setAnimationLoop((ms,frame)=>{
       .multiply(poseQ.setFromEuler(view));
   }
   const triggerHeld=hand=>!!inputs.find(source=>source.handedness===hand)?.gamepad?.buttons[0]?.pressed;
-  const hypnotize=frame?triggerHeld('left'):moveKeys.has('KeyH');
+  const hypnotize=frame?inputs.find(i=>i.handedness==='right')?.gamepad?.buttons[5]?.pressed:moveKeys.has('KeyH');
   eyeCharge=T.MathUtils.clamp(eyeCharge+dt*(hypnotize?.45:-1.4),0,1);
   const blend=T.MathUtils.smoothstep(eyeCharge,0,1);
-  irisMaps.forEach((map,i)=>map.rotation+=dt*((i?.41:.53)+15*blend));
+  irisMaps.forEach((map,i)=>map.rotation+=dt*((i?.41:.53)+17*blend));
   spiralTexture.rotation=irisMaps[0].rotation;
   for(const spiral of spiralEyes){
     spiral.visible=eyeCharge>0;
@@ -67926,17 +67930,14 @@ renderer.setAnimationLoop((ms,frame)=>{
   twitchEars(t);
   flexWhiskers(dt,t);
   const pulse=.5-.5*Math.cos(t*2*Math.PI/5);
-  const lightHue=(.43+t/32+.28*mouthAmount+.04*spread)%1;
+  lightPhase=(lightPhase+dt*(1+5*boostSpeed)/32)%1;
+  const lightHue=(lightPhase+.28*mouthAmount+.04*spread)%1;
   mint.color.setHSL(lightHue,.83,.29);
   mint.emissive.setHSL(lightHue,.94,.32);
   mint.emissiveIntensity=.76+.74*pulse+1.35*mouthAmount;
-  boostFade=T.MathUtils.clamp(boostFade+dt*(boosting?1/.85:-1/1.1),0,1);
-  const redMix=T.MathUtils.smoothstep(boostFade,0,1);
-  mint.color.lerp(boostRed,redMix);
-  mint.emissive.lerp(boostRed,redMix);
   rimLights.forEach(({lens,glow},i)=>{
     const hue=(lightHue+i*.048)%1;
-    lens.color.setHSL(hue,.88,.31+.12*pulse+.15*mouthAmount).lerp(boostRed,redMix);
+    lens.color.setHSL(hue,.88,.31+.12*pulse+.15*mouthAmount);
     glow.color.copy(lens.color);
     glow.opacity=.38+.28*pulse+.34*mouthAmount;
   });
