@@ -9,7 +9,7 @@
 *{box-sizing:border-box}body{margin:0;overflow:hidden;background:#030511;font:14px system-ui,sans-serif}canvas{display:block;position:fixed;inset:0;touch-action:none}
 #panel{position:fixed;z-index:1;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));display:flex;gap:8px}
 #panel[hidden]{display:none}button{border:1px solid #968ab3;border-radius:20px;padding:8px 15px;color:white;background:#241d38dc;font:600 14px system-ui;cursor:pointer}
-button:disabled{color:#bab5c8;border-color:#625a73;cursor:default}button:focus-visible{outline:2px solid #91ffdd}
+button[aria-pressed="true"]{background:#46415e;border-color:#91ffdd;color:#91ffdd}button:disabled{color:#bab5c8;border-color:#625a73;cursor:default}button:focus-visible{outline:2px solid #91ffdd}
 small{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 </style>
 </head>
@@ -48880,7 +48880,7 @@ if ( typeof window !== 'undefined' ) {
 
 
 
-return { CylinderGeometry, ShapeGeometry, Points, PointsMaterial, EqualStencilFunc, ReplaceStencilOp, ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveBlending, AgXToneMapping, AlphaFormat, AlwaysCompare, AlwaysDepth, ArrayCamera, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, ByteType, CanvasTexture, CatmullRomCurve3, CineonToneMapping, CircleGeometry, ClampToEdgeWrapping, Color, ColorManagement, ConstantAlphaFactor, ConstantColorFactor, CubeReflectionMapping, CubeRefractionMapping, CubeTexture, CubeUVReflectionMapping, CullFaceBack, CullFaceFront, CullFaceNone, CustomBlending, CustomToneMapping, Data3DTexture, DataArrayTexture, DepthFormat, DepthStencilFormat, DepthTexture, DirectionalLight, DoubleSide, DstAlphaFactor, DstColorFactor, EqualCompare, EqualDepth, EquirectangularReflectionMapping, EquirectangularRefractionMapping, Euler, EventDispatcher, ExtrudeGeometry, Float32BufferAttribute, FloatType, FrontSide, Frustum, GLSL3, GreaterCompare, GreaterDepth, GreaterEqualCompare, GreaterEqualDepth, Group, HalfFloatType, HemisphereLight, IntType, LatheGeometry, Layers, LessCompare, LessDepth, LessEqualCompare, LessEqualDepth, LinearFilter, LinearMipmapLinearFilter, LinearMipmapNearestFilter, LinearSRGBColorSpace, LinearToneMapping, LinearTransfer, LuminanceAlphaFormat, LuminanceFormat, MathUtils, Matrix3, Matrix4, MaxEquation, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshDistanceMaterial, MeshStandardMaterial, MinEquation, MirroredRepeatWrapping, MixOperation, MultiplyBlending, MultiplyOperation, NearestFilter, NearestMipmapLinearFilter, NearestMipmapNearestFilter, NeutralToneMapping, NeverCompare, NeverDepth, NoBlending, NoColorSpace, NoToneMapping, NormalBlending, NotEqualCompare, NotEqualDepth, Object3D, ObjectSpaceNormalMap, OneFactor, OneMinusConstantAlphaFactor, OneMinusConstantColorFactor, OneMinusDstAlphaFactor, OneMinusDstColorFactor, OneMinusSrcAlphaFactor, OneMinusSrcColorFactor, OrthographicCamera, PCFShadowMap, PCFSoftShadowMap, PerspectiveCamera, Plane, PlaneGeometry, Quaternion, RAD2DEG, RED_GREEN_RGTC2_Format, RED_RGTC1_Format, REVISION, RGBADepthPacking, RGBAFormat, RGBAIntegerFormat, RGBA_ASTC_10x10_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_BPTC_Format, RGBA_ETC2_EAC_Format, RGBA_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGBFormat, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGB_PVRTC_2BPPV1_Format, RGB_PVRTC_4BPPV1_Format, RGB_S3TC_DXT1_Format, RGFormat, RGIntegerFormat, RedFormat, RedIntegerFormat, ReinhardToneMapping, RepeatWrapping, ReverseSubtractEquation, SIGNED_RED_GREEN_RGTC2_Format, SIGNED_RED_RGTC1_Format, SRGBColorSpace, SRGBTransfer, Scene, ShaderMaterial, Shape, ShortType, SphereGeometry, Sprite, SpriteMaterial, SrcAlphaFactor, SrcAlphaSaturateFactor, SrcColorFactor, SubtractEquation, SubtractiveBlending, TangentSpaceNormalMap, Texture, TorusGeometry, TubeGeometry, Uint16BufferAttribute, Uint32BufferAttribute, UniformsUtils, UnsignedByteType, UnsignedInt248Type, UnsignedInt5999Type, UnsignedIntType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedShortType, VSMShadowMap, Vector2, Vector3, Vector4, WebGLCoordinateSystem, WebGLCubeRenderTarget, WebGLRenderTarget, WebXRController, ZeroFactor, arrayNeedsUint32, cloneUniforms, createCanvasElement, createElementNS, getByteLength, getUnlitUniformColorSpace, mergeUniforms, probeAsync, toNormalizedProjectionMatrix, toReversedProjectionMatrix, warnOnce };
+return { DynamicDrawUsage, CylinderGeometry, ShapeGeometry, Points, PointsMaterial, EqualStencilFunc, ReplaceStencilOp, ACESFilmicToneMapping, AddEquation, AddOperation, AdditiveBlending, AgXToneMapping, AlphaFormat, AlwaysCompare, AlwaysDepth, ArrayCamera, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, ByteType, CanvasTexture, CatmullRomCurve3, CineonToneMapping, CircleGeometry, ClampToEdgeWrapping, Color, ColorManagement, ConstantAlphaFactor, ConstantColorFactor, CubeReflectionMapping, CubeRefractionMapping, CubeTexture, CubeUVReflectionMapping, CullFaceBack, CullFaceFront, CullFaceNone, CustomBlending, CustomToneMapping, Data3DTexture, DataArrayTexture, DepthFormat, DepthStencilFormat, DepthTexture, DirectionalLight, DoubleSide, DstAlphaFactor, DstColorFactor, EqualCompare, EqualDepth, EquirectangularReflectionMapping, EquirectangularRefractionMapping, Euler, EventDispatcher, ExtrudeGeometry, Float32BufferAttribute, FloatType, FrontSide, Frustum, GLSL3, GreaterCompare, GreaterDepth, GreaterEqualCompare, GreaterEqualDepth, Group, HalfFloatType, HemisphereLight, IntType, LatheGeometry, Layers, LessCompare, LessDepth, LessEqualCompare, LessEqualDepth, LinearFilter, LinearMipmapLinearFilter, LinearMipmapNearestFilter, LinearSRGBColorSpace, LinearToneMapping, LinearTransfer, LuminanceAlphaFormat, LuminanceFormat, MathUtils, Matrix3, Matrix4, MaxEquation, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshDistanceMaterial, MeshStandardMaterial, MinEquation, MirroredRepeatWrapping, MixOperation, MultiplyBlending, MultiplyOperation, NearestFilter, NearestMipmapLinearFilter, NearestMipmapNearestFilter, NeutralToneMapping, NeverCompare, NeverDepth, NoBlending, NoColorSpace, NoToneMapping, NormalBlending, NotEqualCompare, NotEqualDepth, Object3D, ObjectSpaceNormalMap, OneFactor, OneMinusConstantAlphaFactor, OneMinusConstantColorFactor, OneMinusDstAlphaFactor, OneMinusDstColorFactor, OneMinusSrcAlphaFactor, OneMinusSrcColorFactor, OrthographicCamera, PCFShadowMap, PCFSoftShadowMap, PerspectiveCamera, Plane, PlaneGeometry, Quaternion, RAD2DEG, RED_GREEN_RGTC2_Format, RED_RGTC1_Format, REVISION, RGBADepthPacking, RGBAFormat, RGBAIntegerFormat, RGBA_ASTC_10x10_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_BPTC_Format, RGBA_ETC2_EAC_Format, RGBA_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGBFormat, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGB_PVRTC_2BPPV1_Format, RGB_PVRTC_4BPPV1_Format, RGB_S3TC_DXT1_Format, RGFormat, RGIntegerFormat, RedFormat, RedIntegerFormat, ReinhardToneMapping, RepeatWrapping, ReverseSubtractEquation, SIGNED_RED_GREEN_RGTC2_Format, SIGNED_RED_RGTC1_Format, SRGBColorSpace, SRGBTransfer, Scene, ShaderMaterial, Shape, ShortType, SphereGeometry, Sprite, SpriteMaterial, SrcAlphaFactor, SrcAlphaSaturateFactor, SrcColorFactor, SubtractEquation, SubtractiveBlending, TangentSpaceNormalMap, Texture, TorusGeometry, TubeGeometry, Uint16BufferAttribute, Uint32BufferAttribute, UniformsUtils, UnsignedByteType, UnsignedInt248Type, UnsignedInt5999Type, UnsignedIntType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedShortType, VSMShadowMap, Vector2, Vector3, Vector4, WebGLCoordinateSystem, WebGLCubeRenderTarget, WebGLRenderTarget, WebXRController, ZeroFactor, arrayNeedsUint32, cloneUniforms, createCanvasElement, createElementNS, getByteLength, getUnlitUniformColorSpace, mergeUniforms, probeAsync, toNormalizedProjectionMatrix, toReversedProjectionMatrix, warnOnce };
 })();
 
 const { Color, Matrix3, Vector2, mergeUniforms, Vector3, CubeUVReflectionMapping, Mesh, BoxGeometry, ShaderMaterial, cloneUniforms, BackSide, ColorManagement, SRGBTransfer, PlaneGeometry, FrontSide, getUnlitUniformColorSpace, Euler, Matrix4, IntType, RGBAFormat, HalfFloatType, UnsignedByteType, FloatType, Plane, EquirectangularReflectionMapping, EquirectangularRefractionMapping, WebGLCubeRenderTarget, CubeReflectionMapping, CubeRefractionMapping, PerspectiveCamera, NoToneMapping, MeshBasicMaterial, BufferGeometry, BufferAttribute, WebGLRenderTarget, NoBlending, OrthographicCamera, LinearFilter, LinearSRGBColorSpace, warnOnce, arrayNeedsUint32, Uint32BufferAttribute, Uint16BufferAttribute, Vector4, DataArrayTexture, LessEqualCompare, Texture, DepthTexture, Data3DTexture, CubeTexture, GLSL3, CustomToneMapping, NeutralToneMapping, AgXToneMapping, ACESFilmicToneMapping, CineonToneMapping, ReinhardToneMapping, LinearToneMapping, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap, LinearTransfer, AddOperation, MixOperation, MultiplyOperation, ObjectSpaceNormalMap, TangentSpaceNormalMap, NormalBlending, DoubleSide, UniformsUtils, Layers, Frustum, MeshDepthMaterial, RGBADepthPacking, MeshDistanceMaterial, NearestFilter, LessEqualDepth, AddEquation, SubtractEquation, ReverseSubtractEquation, ZeroFactor, OneFactor, SrcColorFactor, SrcAlphaFactor, SrcAlphaSaturateFactor, DstColorFactor, DstAlphaFactor, OneMinusSrcColorFactor, OneMinusSrcAlphaFactor, OneMinusDstColorFactor, OneMinusDstAlphaFactor, ConstantColorFactor, OneMinusConstantColorFactor, ConstantAlphaFactor, OneMinusConstantAlphaFactor, CustomBlending, MultiplyBlending, SubtractiveBlending, AdditiveBlending, CullFaceNone, CullFaceBack, CullFaceFront, NotEqualDepth, GreaterDepth, GreaterEqualDepth, EqualDepth, LessDepth, AlwaysDepth, NeverDepth, MinEquation, MaxEquation, RepeatWrapping, ClampToEdgeWrapping, MirroredRepeatWrapping, NearestMipmapNearestFilter, NearestMipmapLinearFilter, LinearMipmapNearestFilter, LinearMipmapLinearFilter, NeverCompare, AlwaysCompare, LessCompare, EqualCompare, GreaterEqualCompare, GreaterCompare, NotEqualCompare, NoColorSpace, DepthStencilFormat, getByteLength, UnsignedIntType, UnsignedInt248Type, UnsignedShortType, DepthFormat, createElementNS, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt5999Type, ByteType, ShortType, AlphaFormat, RGBFormat, LuminanceFormat, LuminanceAlphaFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBAIntegerFormat, RGB_S3TC_DXT1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGB_PVRTC_4BPPV1_Format, RGB_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_PVRTC_2BPPV1_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGBA_ETC2_EAC_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_10x10_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_BPTC_Format, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RED_RGTC1_Format, SIGNED_RED_RGTC1_Format, RED_GREEN_RGTC2_Format, SIGNED_RED_GREEN_RGTC2_Format, EventDispatcher, ArrayCamera, WebXRController, RAD2DEG, createCanvasElement, SRGBColorSpace, REVISION, toNormalizedProjectionMatrix, toReversedProjectionMatrix, probeAsync, WebGLCoordinateSystem } = core;
@@ -66987,7 +66987,7 @@ async function startMicrophone(){
   try{
     audioContext=new AudioEngine();
     const resumed=audioContext.resume().then(()=>true,()=>false);
-    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false},video:false});
     if(generation!==micGeneration){stream.getTracks().forEach(track=>track.stop());return;}
     micStream=stream;
     if(!await resumed)throw new Error("Audio unavailable");
@@ -67005,7 +67005,7 @@ async function startMicrophone(){
       micStatus.textContent='Microphone disconnected.';
     },{once:true});
     micButton.textContent='Disable mic';
-    micStatus.textContent='Mic is on. Speak to move the mouth.';
+    micStatus.textContent='Mic is on. Speak to animate the mouth.';
   }catch(error){
     if(generation!==micGeneration)return;
     stopMicrophone();
@@ -67254,8 +67254,24 @@ for(const sign of [-1,1]){
   box(frontWall,frame,0,bottom+openingH/2+sign*(openingH/2+.027),mirrorZ,openingW,.054,.07);
 }
 const aperture=mesh(frontWall,new T.PlaneGeometry(openingW,openingH),
-  new T.MeshBasicMaterial({colorWrite:false,depthWrite:false,stencilWrite:true,stencilRef:1,
-    stencilZPass:T.ReplaceStencilOp}),0,bottom+openingH/2,mirrorZ);
+  new T.ShaderMaterial({
+    uniforms:{sky:{value:starMap}},
+    vertexShader:`varying vec3 surfacePoint;
+      void main(){
+        vec4 world=modelMatrix*vec4(position,1.);
+        surfacePoint=world.xyz;
+        gl_Position=projectionMatrix*viewMatrix*world;
+      }`,
+    fragmentShader:`uniform sampler2D sky;
+      varying vec3 surfacePoint;
+      #include <common>
+      void main(){
+        vec3 direction=reflect(normalize(surfacePoint-cameraPosition),vec3(0.,0.,1.));
+        gl_FragColor=texture2D(sky,equirectUv(direction));
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+    depthWrite:false,stencilWrite:true,stencilRef:1,stencilZPass:T.ReplaceStencilOp}),0,bottom+openingH/2,mirrorZ);
 aperture.renderOrder=-10;
 const back=mesh(frontWall,new T.PlaneGeometry(openingW,openingH),
   material(0x17152c,.5,.48,{side:T.BackSide}),0,bottom+openingH/2,mirrorZ-.035);
@@ -67292,16 +67308,32 @@ const reflected=new T.Group();reflected.position.z=2*mirrorZ;reflected.scale.z=-
 scene.add(reflected);reflected.add(avatar);
 const animatedLights=[mint,...rimLights.flatMap(({lens,glow})=>[lens,glow])];
 const mirrorMaterials=new Map();
-avatar.traverse(part=>{
+renderer.localClippingEnabled=true;
+const virtualSide=new T.Plane(new T.Vector3(0,0,-1),mirrorZ);
+function useMirrorMaterial(part){
   if(!part.material)return;
   const source=part.material;
   if(!mirrorMaterials.has(source)){
     const copy=source.clone();
-    Object.assign(copy,{stencilWrite:true,stencilRef:1,stencilFunc:T.EqualStencilFunc,stencilWriteMask:0});
+    Object.assign(copy,{stencilWrite:true,stencilRef:1,stencilFunc:T.EqualStencilFunc,
+      stencilWriteMask:0,clippingPlanes:[virtualSide]});
     mirrorMaterials.set(source,copy);
   }
   part.material=mirrorMaterials.get(source);
-});
+}
+avatar.traverse(useMirrorMaterial);
+// These objects are direct children of the scene. Share their local matrices
+// so each eye sees their current pose reflected across the same world plane.
+function mirrorSceneObject(source){
+  const image=source.clone();
+  image.traverse(useMirrorMaterial);
+  image.matrixAutoUpdate=false;
+  image.matrix=source.matrix;
+  reflected.add(image);
+  return image;
+}
+mirrorSceneObject(pinStars);
+mirrorSceneObject(sun);
 const laserRange=camera.far*2;
 const laserAxis=new T.Vector3(0,1,0);
 const laserGeometry=new T.CylinderGeometry(1,1,1,12);
@@ -67365,7 +67397,7 @@ function laserVoice(sustain){
   voice.frequency.setValueAtTime(sustain?110:760,now);
   voice.frequency.exponentialRampToValueAtTime(sustain?125:185,now+(sustain?.2:.15));
   level.gain.setValueAtTime(.0001,now);
-  level.gain.exponentialRampToValueAtTime(sustain?.022:.068,now+.012);
+  level.gain.exponentialRampToValueAtTime(sustain?.028:.085,now+.012);
   const modulator=engine.createOscillator(), depth=engine.createGain();
   modulator.frequency.value=sustain?60:95;
   depth.gain.value=sustain?13:65;
@@ -67391,7 +67423,529 @@ function stopFire(){
 }
 window.addEventListener('blur',stopFire);
 renderer.xr.addEventListener('sessionend',stopFire);
+// Mouse pods share their hull, cockpit and pilot geometry across waves.
+const podStyles=[
+  {hull:0x286780,fur:0xe5d5bb,accent:0x65fff1,speed:1.22,tone:240},
+  {hull:0xa34c2e,fur:0x8b685c,accent:0xffb644,speed:.80,tone:115},
+  {hull:0x604688,fur:0xb2b4c9,accent:0xff83dc,speed:1.03,tone:175}
+];
+const mousePink=material(0xff9cad), podBlack=material(0x171529);
+const pilots=[
+  {fur:0xf3e1bd,ears:.16,height:.16,muzzle:.15},
+  {fur:0x75574a,ears:.105,height:.12,muzzle:.20},
+  {fur:0xb3bacc,ears:.105,height:.19,muzzle:.14}
+];
+const pilotCream=material(0xffefd7),pilotPatch=material(0x453739);
+const podModels=podStyles.flatMap((style,index)=>pilots.map((pilot,face)=>{
+  const podModel=new T.Group();
+  const podHull=material(style.hull,.32,.55),mouseFur=material(pilot.fur);
+  const podGlow=new T.MeshBasicMaterial({color:style.accent});
+  oval(podModel,podHull,0,-.13,0,.49,.24,.65);
+  oval(podModel,mouseFur,0,.15,.09,.25,.23,.23);
+  oval(podModel,mouseFur,0,.1,.29,pilot.muzzle,.13,.17);
+  oval(podModel,mousePink,0,.11,.435,.055,.045,.045);
+  for(const side of [-1,1]){
+    oval(podModel,mouseFur,.2*side,.32,.06,pilot.ears,pilot.height,.07).rotation.z=-side*(face===2?.42:.08);
+    oval(podModel,mousePink,.2*side,.32,.115,pilot.ears*.7,pilot.height*.72,.032).rotation.z=-side*(face===2?.42:.08);
+    if(face===1)oval(podModel,pilotCream,side*.13,.11,.31,.095,.075,.085);
+    if(face===2 && side===1)oval(podModel,pilotPatch,.125,.20,.259,.091,.085,.050);
+    oval(podModel,podBlack,.115*side,.19,.28,.039,.046,.034);
+    oval(podModel,podHull,.4*side,-.14,-.18,.13,.14,.5);
+    oval(podModel,podGlow,.4*side,-.14,-.63,.09,.09,.19).name='Booster';
+  }
+  oval(podModel,material(0xaceaff,.18,.1,{transparent:true,opacity:.18,depthWrite:false}),0,.14,.04,.42,.4,.49);
+  for(const side of [-1,1]){
+    const wing=oval(podModel,podHull,side*.46,-.12,-.24,
+      index===0?.36:.17,index===1?.21:.055,index===2?.47:.29);
+    wing.rotation.y=side*.48;
+    oval(podModel,podGlow,side*.31,-.12,.34,.055,.042,.11);
+    oval(podModel,podBlack,side*.19,.20,.03,.073,.105,.09);
+    oval(podModel,podGlow,side*.25,.20,.03,.024,.059,.05);
+  }
+  if(index===2){
+    const fin=oval(podModel,podHull,0,.10,-.43,.05,.28,.22);
+    fin.rotation.x=-.38;
+  }else if(index===1){
+    box(podModel,podHull,0,-.16,.48,.54,.15,.27);
+    box(podModel,podGlow,0,-.15,.62,.30,.035,.015);
+  }
+  if(face===0)oval(podModel,pilotPatch,-.11,.315,.20,.095,.058,.070);
+  return podModel;
+}));
+const pods=[];
+let wave=0,hull=9,toLaunch=0,spawnClock=2,finished=false;
+const course=new T.Vector3(), targetDelta=new T.Vector3(), contactDelta=new T.Vector3();
+const hudCanvas=document.createElement('canvas');
+hudCanvas.width=768;hudCanvas.height=96;
+const hudInk=hudCanvas.getContext('2d'), hudMap=new T.CanvasTexture(hudCanvas);
+const hudMaterial=new T.MeshBasicMaterial({map:hudMap,transparent:true,depthTest:false,depthWrite:false,toneMapped:false});
+const hud=mesh(camera,new T.PlaneGeometry(.60,.075),hudMaterial,0,.28,-1);
+hud.renderOrder=90;hud.frustumCulled=false;
+function updateHud(){
+  hudInk.clearRect(0,0,768,96);
+  hudInk.fillStyle='rgba(9,12,27,.8)';hudInk.fillRect(0,0,768,96);
+  hudInk.font='bold 42px system-ui';hudInk.textAlign='center';hudInk.textBaseline='middle';
+  hudInk.fillStyle=hull<=3?'#ff9a91':'#dafff3';
+  hudInk.fillText(finished?'Game over · Fire to restart':'Wave '+wave+'     Hull '+hull+' / 9    Y '+(shockCooldown?Math.ceil(shockCooldown)+'s':'READY'),384,48);
+  hudMap.needsUpdate=true;
+}
+let runTempo=1,runTone=1,bruteChance=.22,runnerChance=.25,waveTempo=1;
+function nextWave(){
+  if(!wave){
+    shockCooldown=0;shockAge=1;heat=0;laserLock=0;
+    runTempo=.88+Math.random()*.24;runTone=.8+Math.random()*.4;
+    bruteChance=.17+Math.random()*.10;runnerChance=.20+Math.random()*.10;
+  }
+  waveTempo=runTempo*(.94+Math.random()*.12)*(.92+.08*hull/9);
+  wave++;toLaunch=3+2*wave;spawnClock=2;updateHud();
+}
+hud.visible=false;
+const beginWidth=4.95,beginHeight=2.10;
+const beginMap=texture(1024,432,(ctx,w,h)=>{
+  const bezel=ctx.createLinearGradient(0,0,w,h);
+  bezel.addColorStop(0,'#28f5ff');bezel.addColorStop(.5,'#a58bff');bezel.addColorStop(1,'#ff39c4');
+  function rim(inset,cut){
+    ctx.beginPath();
+    for(const [i,[x,y]] of [[inset+cut,inset],[w-inset-cut,inset],[w-inset,inset+cut],
+      [w-inset,h-inset-cut],[w-inset-cut,h-inset],[inset+cut,h-inset],[inset,h-inset-cut],
+      [inset,inset+cut]].entries()){
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+  }
+  const face=ctx.createLinearGradient(0,0,0,h);
+  face.addColorStop(0,'#213953');face.addColorStop(.48,'#090d27');face.addColorStop(1,'#331439');
+  rim(18,54);ctx.fillStyle=face;ctx.fill();
+  ctx.strokeStyle=bezel;ctx.shadowColor='#8454ff';ctx.shadowBlur=19;ctx.lineWidth=8;ctx.stroke();
+  ctx.shadowBlur=0;rim(32,48);ctx.lineWidth=2;ctx.stroke();
+  for(const side of [-1,1]){
+    ctx.save();ctx.translate(w/2, h/2);ctx.scale(side,1);
+    for(let i=0;i<3;i++){
+      const x=365+i*23;
+      ctx.beginPath();ctx.moveTo(x+15,-27);ctx.lineTo(x,0);ctx.lineTo(x+15,27);
+      ctx.strokeStyle=side<0?'#43efff':'#ff63ce';ctx.lineWidth=5;ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='italic 900 178px system-ui';
+  ctx.shadowColor='#38ceff';ctx.shadowBlur=24;ctx.strokeStyle='#24c6ff';ctx.lineWidth=6;
+  ctx.strokeText('BEGIN',w/2,h/2,690);
+  ctx.shadowBlur=0;ctx.fillStyle='#f4fbff';ctx.fillText('BEGIN',w/2,h/2,690);
+});
+const beginTarget=mesh(scene,new T.PlaneGeometry(beginWidth,beginHeight),
+  new T.MeshBasicMaterial({map:beginMap,alphaTest:.1,side:T.DoubleSide,toneMapped:false}),6.25,2.12,-5);
+// Leave the depth buffer available for the virtual UFO. Clip ordinary scenery
+// at the mirror silhouette per eye, including partially covered sprites and signs.
+function occludeBehindMirror(shader){
+  shader.uniforms.mirrorBounds={value:new T.Vector4(openingW/2,bottom,bottom+openingH,mirrorZ)};
+  shader.vertexShader='varying vec3 mirrorViewRay;\n'+shader.vertexShader.replace(
+    '#include <clipping_planes_vertex>',
+    '#include <clipping_planes_vertex>\nmirrorViewRay = mvPosition.xyz * mat3(viewMatrix);'
+  );
+  shader.fragmentShader='varying vec3 mirrorViewRay;\nuniform vec4 mirrorBounds;\n'+shader.fragmentShader.replace(
+    '#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+    float mirrorDepth = mirrorBounds.w - cameraPosition.z;
+    if (mirrorDepth < 0.0 && mirrorViewRay.z < mirrorDepth) {
+      vec2 hit = cameraPosition.xy + mirrorViewRay.xy * (mirrorDepth / mirrorViewRay.z);
+      if (abs(hit.x) <= mirrorBounds.x && hit.y >= mirrorBounds.y && hit.y <= mirrorBounds.z) discard;
+    }`
+  );
+}
+for(const root of [sun,pinStars,beginTarget,craft,...podModels]){
+  root.traverse(part=>{if(part.material)part.material.onBeforeCompile=occludeBehindMirror;});
+}
+function shootBegin(ray,start,end){
+  for(let leg=0;leg<2;leg++){
+    const offset=leg?ray.hit:0;
+    if(offset>end)continue;
+    const origin=leg?ray.contact:ray.origin, dir=leg?ray.outgoing:ray.direction;
+    if(Math.abs(dir.z)<1e-8)continue;
+    const distance=(beginTarget.position.z-origin.z)/dir.z;
+    const travel=offset+distance;
+    if(distance<0 || travel<start || travel>end || (!leg && travel>ray.hit))continue;
+    if(Math.abs(origin.x+distance*dir.x-beginTarget.position.x)>beginWidth/2 ||
+       Math.abs(origin.y+distance*dir.y-beginTarget.position.y)>beginHeight/2)continue;
+    beginTarget.visible=false;hud.visible=true;nextWave();
+    return travel;
+  }
+  return end;
+}
+const warning=mesh(camera,new T.CylinderGeometry(0,.022,.065,3),new T.MeshBasicMaterial({
+  color:0xff2929,depthTest:false,depthWrite:false,toneMapped:false
+}),0,0,-.85);
+warning.renderOrder=91;warning.visible=false;warning.frustumCulled=false;
+const sight=new T.Vector3(), nearestThreat=new T.Vector3();
+let blastNoise=null;
+const soundPosition=new T.Vector3();
+function podSound(pod,explosion){
+  if(!engine || engine.state!=='running')return;
+  const now=engine.currentTime, style=podStyles[pod.userData.style];
+  const eye=renderer.xr.isPresenting?(renderer.xr.getCamera().cameras[0]||camera):camera;
+  soundPosition.copy(pod.position).applyMatrix4(eye.matrixWorldInverse);
+  const distance=soundPosition.length();
+  const pan=engine.createStereoPanner(), level=engine.createGain();
+  pan.pan.value=T.MathUtils.clamp(soundPosition.x/Math.max(1,Math.hypot(soundPosition.x,soundPosition.z)),-1,1);
+  level.connect(pan).connect(engine.destination);
+  const proximity=1/(1+.065*distance);
+  const duration=explosion?.22+Math.random()*.32:.16;
+  const peak=(explosion?.28:.065)*proximity;
+  level.gain.setValueAtTime(.0001,now);
+  level.gain.exponentialRampToValueAtTime(peak+.0001,now+.014);
+  level.gain.exponentialRampToValueAtTime(.0001,now+duration);
+  const tone=engine.createOscillator();
+  tone.type=explosion?'triangle':'sine';
+  const hz=style.tone*(explosion?.7+Math.random()*.8:1+1.6*proximity);
+  tone.frequency.setValueAtTime(hz,now);
+  tone.frequency.exponentialRampToValueAtTime(explosion?38+Math.random()*34:hz*1.32,now+duration);
+  tone.connect(level);tone.start(now);tone.stop(now+duration);
+  if(explosion){
+    if(!blastNoise){
+      blastNoise=engine.createBuffer(1,Math.ceil(engine.sampleRate*.6),engine.sampleRate);
+      const data=blastNoise.getChannelData(0);
+      for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+    }
+    const noise=engine.createBufferSource(), filter=engine.createBiquadFilter();
+    noise.buffer=blastNoise;filter.type='lowpass';
+    filter.frequency.setValueAtTime(900+Math.random()*3800,now);
+    filter.frequency.exponentialRampToValueAtTime(100,now+duration);
+    noise.connect(filter).connect(level);noise.start(now);noise.stop(now+duration);
+    noise.onended=()=>{noise.disconnect();filter.disconnect();};
+  }
+  tone.onended=()=>{tone.disconnect();level.disconnect();pan.disconnect();};
+}
+// Sweep each route against a box expanded to fit the wings at any orientation.
+const podBarrierMin=new T.Vector3(-openingW/2-.96,bottom-.96,mirrorZ-.94);
+const podBarrierMax=new T.Vector3(openingW/2+.96,bottom+openingH+.96,mirrorZ+.94);
+function blockedPodPath(start,end,padding=0){
+  let near=0,far=1;
+  for(const axis of ['x','y','z']){
+    const step=end[axis]-start[axis],low=podBarrierMin[axis]-padding,high=podBarrierMax[axis]+padding;
+    if(Math.abs(step)<1e-9){
+      if(start[axis]<low || start[axis]>high)return false;
+    }else{
+      const a=(low-start[axis])/step,b=(high-start[axis])/step;
+      near=Math.max(near,Math.min(a,b));far=Math.min(far,Math.max(a,b));
+      if(near>far)return false;
+    }
+  }
+  return true;
+}
+const bruteScale=1.85,brutePadding=.9;
+function routeCorners(padding){
+  const corners=[];
+  for(const x of [podBarrierMin.x-padding-.18,podBarrierMax.x+padding+.18])
+    for(const y of [podBarrierMin.y-padding-.18,podBarrierMax.y+padding+.18])
+      for(const z of [podBarrierMin.z-padding-.18,podBarrierMax.z+padding+.18])
+        corners.push(new T.Vector3(x,y,z));
+  return corners;
+}
+const normalCorners=routeCorners(0),bruteCorners=routeCorners(brutePadding);
+const waypoint=new T.Vector3();
+function steerPod(pod,target){
+  const padding=pod.userData.padding;
+  const detourCorners=padding?bruteCorners:normalCorners;
+  waypoint.copy(target);
+  if(!blockedPodPath(pod.position,target,padding))return true;
+  // A box is convex. Any two exterior points connect via at most two
+  // visible corners (the segment between corners must also clear the box).
+  let shortest=Infinity;
+  waypoint.copy(pod.position);
+  for(const entry of detourCorners){
+    if(blockedPodPath(pod.position,entry,padding))continue;
+    for(const exit of detourCorners){
+      if(blockedPodPath(entry,exit,padding) || blockedPodPath(exit,target,padding))continue;
+      const length=pod.position.distanceTo(entry)+entry.distanceTo(exit)+exit.distanceTo(target);
+      if(length>=shortest)continue;
+      shortest=length;
+      waypoint.copy(pod.position.distanceToSquared(entry)<.000001?exit:entry);
+    }
+  }
+  return false;
+}
+const bursts=[];
+const sparkMap=texture(32,32,(ctx,w,h)=>{
+  const g=ctx.createRadialGradient(16,16,0,16,16,16);
+  g.addColorStop(0,'white');g.addColorStop(.25,'white');g.addColorStop(1,'transparent');
+  ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+});
+const sparkMaterial=new T.PointsMaterial({size:.21,map:sparkMap,vertexColors:true,
+  transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false});
+sparkMaterial.onBeforeCompile=occludeBehindMirror;
+function burstPod(pod,contact,incoming,destroyed){
+  const outward=new T.Vector3().subVectors(contact,pod.position).normalize();
+  const spray=incoming.clone().reflect(outward);
+  const size=pod.scale.x;
+  const count=destroyed?Math.round((36+Math.random()*18)*size):8,positions=new Float32Array(count*3),colors=[],speeds=[];
+  const accent=new T.Color(podStyles[pod.userData.style].accent);
+  for(let i=0;i<count;i++){
+    const velocity=new T.Vector3().randomDirection();
+    if(i%3!==0 || !destroyed)velocity.addScaledVector(spray,.8).addScaledVector(outward,1.2);
+    speeds.push(velocity.normalize().multiplyScalar((1.4+Math.random()*4.5)*Math.sqrt(size)));
+    const tint=i%3===0?accent:new T.Color(i%3===1?0xff8835:0xfff3cf);
+    colors.push(tint.r,tint.g,tint.b);
+  }
+  const geo=new T.BufferGeometry();
+  geo.setAttribute('position',new T.BufferAttribute(positions,3));
+  geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));
+  const sparks=new T.Points(geo,sparkMaterial);
+  sparks.frustumCulled=false;sparks.position.copy(contact);scene.add(sparks);
+  sparks.updateMatrix();
+  const image=mirrorSceneObject(sparks);
+  bursts.push({sparks,image,speeds,age:0,life:(destroyed?.52+Math.random()*.32:.19)*Math.sqrt(size)});
+}
+function updateBursts(dt){
+  for(let i=bursts.length-1;i>=0;i--){
+    const burst=bursts[i];burst.age+=dt;
+    const points=burst.sparks.geometry.attributes.position;
+    if(burst.age>=burst.life){
+      burst.image.removeFromParent();burst.sparks.removeFromParent();
+      burst.sparks.geometry.dispose();bursts.splice(i,1);continue;
+    }
+    const distance=(1-Math.exp(-3*burst.age))/3;
+    for(let j=0;j<points.count;j++){
+      const v=burst.speeds[j];
+      points.setXYZ(j,v.x*distance,v.y*distance,v.z*distance);
+    }
+    points.needsUpdate=true;
+    burst.sparks.geometry.setDrawRange(0,Math.ceil(points.count*Math.min(1,(burst.life-burst.age)/.27)));
+  }
+}
+const shock=new T.Group();
+const pulseMaterial=new T.MeshBasicMaterial({color:0x99edff,transparent:true,
+  depthWrite:false,blending:T.AdditiveBlending,toneMapped:false});
+pulseMaterial.onBeforeCompile=occludeBehindMirror;
+const pulseGeometry=new T.TorusGeometry(1,.012,6,96);
+for(let i=0;i<3;i++){
+  const ring=new T.Mesh(pulseGeometry,pulseMaterial);
+  ring.rotation.set(i===0?Math.PI/2:.35,i===2?Math.PI/2:0,0);
+  shock.add(ring);
+}
+scene.add(shock);
+const shockImage=mirrorSceneObject(shock);
+shock.visible=shockImage.visible=false;
+let shockCooldown=0,shockAge=1,shockSerial=0,shockPressed=false;
+const pushNext=new T.Vector3();
+function updateShock(down,dt){
+  const lastSecond=Math.ceil(shockCooldown);
+  shockCooldown=Math.max(0,shockCooldown-dt);
+  if(down && !shockPressed && !shockCooldown && wave && !finished){
+    shock.position.copy(craft.position);shockAge=0;shockCooldown=8;shockSerial++;
+  }
+  shockPressed=down;
+  if(wave && lastSecond!==Math.ceil(shockCooldown))updateHud();
+  shockAge+=dt;
+  shock.visible=shockImage.visible=shockAge<=.65 && !finished;
+  if(!shock.visible)return;
+  const radius=.4+15*shockAge/.65;
+  shock.scale.setScalar(radius);shock.updateMatrix();
+  pulseMaterial.opacity=shockImage.children[0].material.opacity=.8*(1-shockAge/.65);
+  for(const pod of pods){
+    const data=pod.userData;
+    if(data.lastShock===shockSerial || pod.position.distanceTo(shock.position)>radius ||
+      blockedPodPath(shock.position,pod.position,-.88))continue;
+    data.lastShock=shockSerial;
+    data.recoil=new T.Vector3().subVectors(pod.position,shock.position).normalize();
+    data.recoilTime=.56;data.boostTime=.85;
+  }
+}
+const activeHums=new Map();
+function stopHum(pod){
+  const hum=activeHums.get(pod);
+  if(!hum)return;
+  activeHums.delete(pod);
+  const now=engine.currentTime;
+  hum.level.gain.setTargetAtTime(.00001,now,.015);
+  hum.osc.stop(now+.06);
+}
+function updateHum(pod,eye,distance,speed,t){
+  if(!engine || engine.state!=='running' || document.hidden || distance>36){stopHum(pod);return;}
+  let hum=activeHums.get(pod);
+  if(!hum){
+    const osc=engine.createOscillator(),level=engine.createGain(),pan=engine.createPanner();
+    pan.panningModel='HRTF';pan.rolloffFactor=0;
+    osc.type=pod.userData.humType;level.gain.value=0;
+    osc.connect(level).connect(pan).connect(engine.destination);
+    osc.onended=()=>{osc.disconnect();level.disconnect();pan.disconnect();};
+    osc.start();hum={osc,level,pan};activeHums.set(pod,hum);
+  }
+  const local=soundPosition.copy(pod.position).applyMatrix4(eye.matrixWorldInverse);
+  hum.pan.setPosition(local.x,local.y,local.z);
+  const near=1/(1+.095*distance),now=engine.currentTime;
+  const voice=pod.userData;
+  const phase=t*voice.wobble+voice.humPhase;
+  const flutter=Math.sin(phase+.85*Math.sin(phase*.43));
+  const swell=.64+.25*flutter+.11*Math.sin(1.73*phase+.6);
+  const bend=1+.066*flutter+.017*Math.sin(2.37*phase);
+  hum.osc.frequency.setTargetAtTime(voice.hz*(.84+.40*near+.16*speed)*bend,now,.032);
+  hum.level.gain.setTargetAtTime(.043*swell*near/Math.sqrt(Math.max(1,activeHums.size*.5)),now,.055);
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)for(const pod of activeHums.keys())stopHum(pod);
+});
+function launchPod(){
+  const bearing=avatar.rotation.y+(Math.random()-.5)*Math.PI*2;
+  const variant=Math.floor(Math.random()*podModels.length);
+  const pod=podModels[variant].clone();
+  pod.userData.style=Math.floor(variant/pilots.length);
+  pod.userData.speed=waveTempo*(2.6+.46*wave)*podStyles[pod.userData.style].speed*(.86+Math.random()*.28);
+  const roll=Math.random();
+  const brute=wave>=3 && roll<bruteChance;
+  const sprinter=wave>=4 && roll>=bruteChance && roll<bruteChance+runnerChance;
+  pod.userData.hz=runTone*podStyles[pod.userData.style].tone*(.68+Math.random()*.26)*(brute?.68:sprinter?1.4:1);
+  pod.userData.wobble=6+Math.random()*11;
+  pod.userData.humPhase=Math.random()*Math.PI*2;
+  pod.userData.humType=brute?'sawtooth':sprinter?'triangle':Math.random()<.5?'sine':'triangle';
+  pod.userData.padding=brute?brutePadding:0;
+  pod.userData.hp=brute?6:1;
+  pod.userData.sparkClock=0;
+  if(brute){pod.scale.setScalar(bruteScale);pod.userData.speed*=.76;}
+  if(sprinter){pod.scale.set(.83,.83,1.18);pod.userData.speed*=2.65;}
+  pod.userData.soundClock=.2+Math.random()*.5;
+  course.set(-Math.sin(bearing),(Math.random()-.5)*.65,-Math.cos(bearing)).normalize();
+  pod.position.copy(craft.position).addScaledVector(course,23+Math.random()*9);
+  if(blockedPodPath(pod.position,pod.position,pod.userData.padding))pod.position.x=podBarrierMax.x+pod.userData.padding+.25;
+  pod.userData.mirrorImage=mirrorSceneObject(pod);
+  pods.push(pod);scene.add(pod);toLaunch--;
+}
+function removePod(index){
+  stopHum(pods[index]);
+  pods[index].userData.mirrorImage.removeFromParent();
+  pods[index].removeFromParent();pods.splice(index,1);
+}
+const laserImpact=new T.Vector3();
+function hitPod(ray,start,end,damage=1){
+  if(beginTarget.visible)return shootBegin(ray,start,end);
+  // Select the first target crossed along the real beam, including its bounce.
+  let first=-1,best=end,hitLeg=0;
+  for(let i=0;i<pods.length;i++){
+    for(let leg=0;leg<2;leg++){
+      const low=leg?Math.max(start,ray.hit):start;
+      const high=Math.min(best,leg?end:ray.hit);
+      if(high<=low)continue;
+      const dir=leg?ray.outgoing:ray.direction;
+      contactDelta.subVectors(pods[i].position,leg?ray.contact:ray.origin);
+      const along=contactDelta.dot(dir);
+      const radial=contactDelta.lengthSq()-along*along;
+      const radius=.56*pods[i].scale.x+ray.radius;
+      if(radial>radius*radius)continue;
+      const half=Math.sqrt(radius*radius-radial),offset=leg?ray.hit:0;
+      const entry=Math.max(low,offset+along-half);
+      if(entry<=high && offset+along+half>=low){best=entry;first=i;hitLeg=leg;}
+    }
+  }
+  if(first>=0){
+    const pod=pods[first],direction=hitLeg?ray.outgoing:ray.direction;
+    laserImpact.copy(hitLeg?ray.contact:ray.origin).addScaledVector(direction,best-(hitLeg?ray.hit:0));
+    pod.userData.hp-=pod.userData.padding?damage:1;
+    if(pod.userData.hp<=.000001){
+      burstPod(pod,laserImpact,direction,true);podSound(pod,true);removePod(first);
+    }else if(pod.userData.sparkClock<=0){
+      burstPod(pod,laserImpact,direction,false);pod.userData.sparkClock=.12;
+    }
+  }
+  return best;
+}
+let fireWasDown=false;
+function updateWave(dt,t,down){
+  updateBursts(dt);
+  if(beginTarget.visible)return;
+  if(finished){
+    if(down && !fireWasDown){finished=false;wave=0;hull=9;nextWave();}
+    fireWasDown=down;return;
+  }
+  fireWasDown=down;
+  spawnClock-=dt;
+  if(toLaunch && spawnClock<=0){launchPod();spawnClock=Math.max(.32,2.5/(waveTempo*(1+.14*wave)));}
+  const eye=renderer.xr.isPresenting?(renderer.xr.getCamera().cameras[0]||camera):camera;
+  if(!renderer.xr.isPresenting)camera.updateWorldMatrix(true,false);
+  let nearest=Infinity;
+  for(let i=pods.length-1;i>=0;i--){
+    const pod=pods[i];
+    targetDelta.subVectors(craft.position,pod.position);
+    const data=pod.userData;
+    if(data.recoilTime>0){
+      pushNext.copy(pod.position).addScaledVector(data.recoil,dt*(4+14*data.recoilTime/.56));
+      if(!blockedPodPath(pod.position,pushNext,data.padding))pod.position.copy(pushNext);
+      data.recoilTime=Math.max(0,data.recoilTime-dt);
+      continue;
+    }
+    const boost=data.boostTime||0;
+    if(boost || data.boostLit){
+      for(let j=0;j<pod.children.length;j++){
+        const nozzle=pod.children[j];
+        if(nozzle.name==='Booster'){
+          nozzle.scale.z=data.mirrorImage.children[j].scale.z=.19+.55*boost;
+          nozzle.position.z=data.mirrorImage.children[j].position.z=-.63-.48*boost;
+        }
+      }
+      data.boostLit=boost>0;data.boostTime=Math.max(0,boost-dt);
+    }
+    const distance=targetDelta.length(), speedFactor=1+.7*boost;
+    const travel=pod.userData.speed*speedFactor*dt;
+    updateHum(pod,eye,distance,speedFactor,t);
+    const direct=steerPod(pod,craft.position);
+    if((direct || !blockedPodPath(pod.position,craft.position)) && distance<=.85*pod.scale.x+travel){
+      removePod(i);hull--;finished=hull===0;updateHud();
+      if(finished){while(pods.length)removePod(pods.length-1);break;}
+      continue;
+    }
+    pod.userData.sparkClock-=dt;
+    pod.userData.soundClock-=dt;
+    if(pod.userData.soundClock<=0){
+      podSound(pod,false);
+      pod.userData.soundClock=.25+Math.min(1.2,distance*.038);
+    }
+    targetDelta.subVectors(waypoint,pod.position);
+    const remaining=targetDelta.length();
+    if(remaining>.0001){
+      pod.lookAt(waypoint);
+      pod.position.addScaledVector(targetDelta,Math.min(travel/remaining,1));
+    }
+    sight.copy(pod.position).applyMatrix4(eye.matrixWorldInverse);
+    const behind=sight.z>=0;
+    sight.applyMatrix4(eye.projectionMatrix);
+    if(distance<nearest && (behind || Math.abs(sight.x)>1 || Math.abs(sight.y)>1)){
+      nearest=distance;
+      nearestThreat.copy(pod.position).applyMatrix4(eye.matrixWorldInverse);
+    }
+  }
+  warning.visible=!finished && nearest<Infinity;
+  if(warning.visible){
+    const v=nearestThreat;
+    if(v.z>0 && Math.abs(v.x)<.1*v.z)v.y=-Math.max(.1,Math.abs(v.y));
+    const angle=Math.atan2(v.y,v.x);
+    warning.position.set(.16*Math.cos(angle),.12*Math.sin(angle),-.85);
+    warning.rotation.z=angle-Math.PI/2;
+    warning.material.color.setHex(Math.sin(t*10)>0?0xff3030:0x700b14);
+  }
+  if(!finished && !toLaunch && !pods.length)nextWave();
+}
+
+const meter=new T.Group();craft.add(meter);meter.position.set(0,.05,-2.8);
+const meterBase=new T.MeshBasicMaterial({color:0x172332,toneMapped:false});
+const meterInk=new T.MeshBasicMaterial({color:0x68edc7,toneMapped:false});
+box(meter,meterBase,0,0,0,.39,.053,.014);
+const meterFill=box(meter,meterInk,0,0,.013,.36,.029,.012);
+meter.visible=false;
+let heat=0,laserLock=0,triggerTime=0;
+function laserAllowed(down,dt){
+  const activeTime=triggerTime;
+  triggerTime=down?triggerTime+dt:0;
+  meter.visible=down && triggerTime>=.32;
+  if(laserLock>0){
+    laserLock=Math.max(0,laserLock-dt);
+    heat=laserLock/5;
+  }else if(meter.visible){
+    heat=Math.min(1,heat+(triggerTime-Math.max(.32,activeTime))/4);
+    if(heat>=1)laserLock=5;
+  }else heat=Math.max(0,heat-dt*.32);
+  meterFill.scale.x=Math.max(.001,heat);
+  meterFill.position.x=-.18+.18*heat;
+  meterInk.color.setHSL(laserLock?0:.36*(1-heat),.9,.6);
+  return down && !laserLock;
+}
 function updateLasers(down,dt){
+  down=laserAllowed(down,dt);
   if(down)liveEmitters.updateWorldMatrix(true,false);
   if(down && !firing){
     firing=true;laserVoice(false);
@@ -67404,13 +67958,14 @@ function updateLasers(down,dt){
     heldTime+=dt;
     if(heldTime>=.32){
       if(!sustained[0].group.visible)laserVoice(true);
-      for(const ray of sustained){aimLaser(ray);drawLaser(ray,0,laserRange);}
+      for(const ray of sustained){aimLaser(ray);drawLaser(ray,0,hitPod(ray,0,laserRange,dt*3.6));}
     }
   }else if(firing)stopFire();
   for(let i=bolts.length-1;i>=0;i--){
     const ray=bolts[i];
+    const previous=ray.travel;
     ray.travel+=22*dt;
-    if(ray.travel>laserRange){
+    if(ray.travel>laserRange || hitPod(ray,previous,ray.travel+.58)<ray.travel+.58){
       ray.group.removeFromParent();ray.mirrorBeam.removeFromParent();bolts.splice(i,1);
     }else drawLaser(ray,ray.travel,ray.travel+.58);
   }
@@ -67512,8 +68067,10 @@ function stopAtMirror(previous,next){
 }
 let drag=null, desktopYaw=0, desktopPitch=Math.atan2(-.21,1.09-mirrorZ);
 const desktopPosition=new T.Vector3(0,1.38,1.09);
+let tiltMode=false,stickWasDown=false,shipPitch=0;
+renderer.xr.addEventListener('sessionend',()=>{tiltMode=false;stickWasDown=false;shipPitch=0;});
 const moveKeys=new Set();
-const walkingKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','Space','KeyH','KeyF']);
+const walkingKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','Space','KeyH','KeyF','KeyY']);
 window.addEventListener('keydown',e=>{
   if(!walkingKeys.has(e.code) || e.altKey || e.ctrlKey || e.metaKey)return;
   e.preventDefault();
@@ -67906,7 +68463,12 @@ renderer.setAnimationLoop((ms,frame)=>{
         previousViewer.set(0,position.y,0);
         anchored=true;
       }
-      const [turn,lift]=stick(inputs.find(input=>input.handedness==='right')?.gamepad);
+      const rightPad=inputs.find(input=>input.handedness==='right')?.gamepad;
+      const [turn,lift]=stick(rightPad);
+      const clicked=!!rightPad?.buttons[3]?.pressed;
+      if(clicked && !stickWasDown)tiltMode=!tiltMode;
+      stickWasDown=clicked;
+      if(tiltMode)shipPitch=T.MathUtils.clamp(shipPitch-lift*dt*1.35,-1.45,1.45);
       if(turn){
         rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y);
         rig.rotation.y=(rig.rotation.y-turn*Math.PI*.75*dt)%(2*Math.PI);
@@ -67915,7 +68477,7 @@ renderer.setAnimationLoop((ms,frame)=>{
       }
       const [strafe,walk]=stick(inputs.find(input=>input.handedness==='left')?.gamepad);
       boosting=inputs.find(i=>i.handedness==='left')?.gamepad?.buttons[3]?.pressed;
-      fly(rig.position,strafe,-lift,walk,view.y+rig.rotation.y,boosting,dt);
+      fly(rig.position,strafe,tiltMode?0:-lift,walk,view.y+rig.rotation.y,boosting,dt);
       rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
       nextViewer.set(rotatedHead.x,position.y+rig.position.y,rotatedHead.z);
       const before=displacement.copy(nextViewer);
@@ -67953,6 +68515,7 @@ renderer.setAnimationLoop((ms,frame)=>{
   const delta=T.MathUtils.euclideanModulo(yaw-avatar.rotation.y+Math.PI,2*Math.PI)-Math.PI;
   const neckYaw=T.MathUtils.clamp(delta,-1.05,1.05)*Math.exp(-2.3*dt);
   avatar.rotation.y=yaw-neckYaw;
+  ufo.rotation.x=frame?shipPitch:desktopPitch;
   localLoad.copy(flightLoad).applyAxisAngle(up,-avatar.rotation.y);
   seatedLean.lerp(localLoad,1-Math.exp(-(8+5*boostSpeed)*dt));
   const breath=Math.sin(t*1.68+.22*Math.sin(t*.4));
@@ -68010,7 +68573,11 @@ renderer.setAnimationLoop((ms,frame)=>{
   const thrust=Math.min(1,velocity.length()/6);
   craft.position.copy(avatar.position);
   craft.quaternion.copy(avatar.quaternion).multiply(ufo.quaternion);
-  updateLasers(frame?triggerHeld('right'):moveKeys.has('KeyF'),dt);
+  const fireDown=frame?triggerHeld('right'):moveKeys.has('KeyF');
+  const yDown=frame?!!inputs.find(i=>i.handedness==='left')?.gamepad?.buttons[5]?.pressed:moveKeys.has('KeyY');
+  updateShock(yDown,dt);
+  updateWave(dt,t,fireDown);
+  updateLasers(!finished && fireDown,dt);
   pinStars.position.set(x,avatarHeight,z);
   const heading=avatar.rotation.y;
   const speed=Math.max(.001,velocity.length());
@@ -68055,6 +68622,8 @@ renderer.setAnimationLoop((ms,frame)=>{
     pan.pan.setTargetAtTime(.74*lateral,now,.07);
   }
   updateSun();
+  sun.updateMatrix();pinStars.updateMatrix();
+  for(const pod of pods)pod.updateMatrix();
   try { renderer.render(scene,camera); }
   catch(error){
     renderer.setAnimationLoop(null);
