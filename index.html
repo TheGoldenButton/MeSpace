@@ -67270,13 +67270,6 @@ for(const side of [-1,1]){
   const barrel=oval(emitters,darkMetal,side*.34,.05,-.64,.058,.056,.19);
   oval(emitters,laserMaterial,barrel.position.x,.05,-.817,.038,.038,.028);
 }
-const beamGroup=new T.Group();
-emitters.add(beamGroup);
-for(const x of [-.34,.34]){
-  const beam=mesh(beamGroup,new T.CylinderGeometry(.022,.022,18,12),laserMaterial,x,.05,-9.84);
-  beam.rotation.x=Math.PI/2;
-}
-beamGroup.visible=false;
 const jets=new T.Group();ufo.add(jets);
 const plumeMap=texture(16,128,(ctx,w,h)=>{
   const g=ctx.createLinearGradient(0,0,0,h);
@@ -67309,9 +67302,61 @@ avatar.traverse(part=>{
   }
   part.material=mirrorMaterials.get(source);
 });
-const liveBeam=craft.children[ufo.children.filter(child=>child!==cat).indexOf(emitters)].children.at(-1);
+const laserRange=camera.far*2;
+const laserAxis=new T.Vector3(0,1,0);
+const laserGeometry=new T.CylinderGeometry(1,1,1,12);
+glass.updateWorldMatrix(true,false);
+const mirrorPlane=new T.Plane(new T.Vector3(0,0,1),0).applyMatrix4(glass.matrixWorld);
+const glassLocalHit=new T.Vector3();
+const mirrorLaserMaterial=mirrorMaterials.get(laserMaterial).clone();
+mirrorLaserMaterial.color.setHex(0xb94c58);
+const liveEmitters=craft.children[ufo.children.filter(child=>child!==cat).indexOf(emitters)];
+function makeLaser(x,radius){
+  const group=new T.Group();
+  for(let i=0;i<2;i++) group.add(new T.Mesh(laserGeometry,laserMaterial));
+  scene.add(group);
+  const mirrorBeam=new T.Mesh(laserGeometry,mirrorLaserMaterial);
+  reflected.add(mirrorBeam);
+  group.visible=mirrorBeam.visible=false;
+  return {x,radius,group,mirrorBeam,origin:new T.Vector3(),direction:new T.Vector3(),contact:new T.Vector3(),outgoing:new T.Vector3(),hit:Infinity};
+}
+function aimLaser(ray){
+  ray.origin.set(ray.x,.05,-.84).applyMatrix4(liveEmitters.matrixWorld);
+  const dir=ray.direction.set(0,0,-1).transformDirection(liveEmitters.matrixWorld);
+  ray.hit=Infinity;
+  const incidence=dir.dot(mirrorPlane.normal);
+  if(Math.abs(incidence)<1e-10)return;
+  const distance=-mirrorPlane.distanceToPoint(ray.origin)/incidence;
+  if(distance<0 || distance>laserRange)return;
+  ray.contact.copy(ray.origin).addScaledVector(dir,distance);
+  glass.worldToLocal(glassLocalHit.copy(ray.contact));
+  if(Math.abs(glassLocalHit.x)>openingW/2 || Math.abs(glassLocalHit.y)>openingH/2)return;
+  ray.hit=distance;
+  ray.outgoing.copy(dir).reflect(mirrorPlane.normal);
+}
+function drawLaser(ray,tail,head){
+  ray.group.visible=true;
+  for(let i=0;i<2;i++){
+    const part=ray.group.children[i];
+    const a=i?Math.max(tail,ray.hit):tail;
+    const b=i?head:Math.min(head,ray.hit);
+    part.visible=b>a;
+    if(i===0)ray.mirrorBeam.visible=part.visible;
+    if(!part.visible)continue;
+    const heading=i?ray.outgoing:ray.direction;
+    const offset=i?a-ray.hit:a;
+    part.position.copy(i?ray.contact:ray.origin).addScaledVector(heading,offset+(b-a)/2);
+    part.quaternion.setFromUnitVectors(laserAxis,heading);
+    part.scale.set(ray.radius,b-a,ray.radius);
+    if(i===0){
+      ray.mirrorBeam.position.copy(part.position);
+      ray.mirrorBeam.quaternion.copy(part.quaternion);
+      ray.mirrorBeam.scale.copy(part.scale);
+    }
+  }
+}
+const sustained=[-.34,.34].map(x=>makeLaser(x,.022));
 const bolts=[];
-const boltGeometry=new T.CylinderGeometry(.026,.026,.58,12);
 let eyeCharge=0, heldTime=0, firing=false, beamVoice=null;
 function laserVoice(sustain){
   if(!engine)return;
@@ -67336,7 +67381,7 @@ function laserVoice(sustain){
   }
 }
 function stopFire(){
-  firing=false;heldTime=0;beamGroup.visible=liveBeam.visible=false;
+  firing=false;heldTime=0;for(const ray of sustained)ray.group.visible=ray.mirrorBeam.visible=false;
   if(beamVoice){
     const {voice,level}=beamVoice, now=engine.currentTime;
     level.gain.cancelScheduledValues(now);
@@ -67347,32 +67392,27 @@ function stopFire(){
 window.addEventListener('blur',stopFire);
 renderer.xr.addEventListener('sessionend',stopFire);
 function updateLasers(down,dt){
+  if(down)liveEmitters.updateWorldMatrix(true,false);
   if(down && !firing){
     firing=true;laserVoice(false);
-    const pair=new T.Group();
-    pair.position.copy(craft.position);pair.quaternion.copy(craft.quaternion);
-    for(const x of [-.34,.34])
-      mesh(pair,boltGeometry,laserMaterial,x,.05,-1.13).rotation.x=Math.PI/2;
-    scene.add(pair);
-    const echo=pair.clone();
-    echo.traverse(part=>{if(part.isMesh)part.material=mirrorMaterials.get(laserMaterial);});
-    reflected.add(echo);
-    bolts.push({pair,echo,age:0});
+    for(const x of [-.34,.34]){
+      const ray=makeLaser(x,.026);
+      aimLaser(ray);ray.travel=0;bolts.push(ray);
+    }
   }
   if(down){
     heldTime+=dt;
-    if(heldTime>=.32 && !liveBeam.visible){
-      liveBeam.visible=beamGroup.visible=true;
-      laserVoice(true);
+    if(heldTime>=.32){
+      if(!sustained[0].group.visible)laserVoice(true);
+      for(const ray of sustained){aimLaser(ray);drawLaser(ray,0,laserRange);}
     }
   }else if(firing)stopFire();
   for(let i=bolts.length-1;i>=0;i--){
-    const bolt=bolts[i];
-    bolt.pair.translateZ(-22*dt);
-    bolt.echo.position.copy(bolt.pair.position);
-    if((bolt.age+=dt)>1.1){
-      bolt.pair.removeFromParent();bolt.echo.removeFromParent();bolts.splice(i,1);
-    }
+    const ray=bolts[i];
+    ray.travel+=22*dt;
+    if(ray.travel>laserRange){
+      ray.group.removeFromParent();ray.mirrorBeam.removeFromParent();bolts.splice(i,1);
+    }else drawLaser(ray,ray.travel,ray.travel+.58);
   }
 }
 // Solid surfaces cast shadows. Fine fur receives the underlying body shadow.
@@ -67906,14 +67946,13 @@ renderer.setAnimationLoop((ms,frame)=>{
     x=desktopPosition.x;z=desktopPosition.z;
     avatarHeight=desktopPosition.y;
   }
-  avatar.position.set(x,avatarHeight-1.10+Math.sin(t*1.95)*.018,z);
+  avatar.position.set(x,avatarHeight-1.10,z);
   reflected.visible=z>mirrorZ;
   if(!viewer)leanWorld.set(0,0,0);
   avatar.position.sub(leanWorld);
   const delta=T.MathUtils.euclideanModulo(yaw-avatar.rotation.y+Math.PI,2*Math.PI)-Math.PI;
   const neckYaw=T.MathUtils.clamp(delta,-1.05,1.05)*Math.exp(-2.3*dt);
   avatar.rotation.y=yaw-neckYaw;
-  ufo.rotation.set(Math.sin(t*1.4)*.015,0,Math.cos(t*1.18)*.021);
   localLoad.copy(flightLoad).applyAxisAngle(up,-avatar.rotation.y);
   seatedLean.lerp(localLoad,1-Math.exp(-(8+5*boostSpeed)*dt));
   const breath=Math.sin(t*1.68+.22*Math.sin(t*.4));
@@ -67970,10 +68009,10 @@ renderer.setAnimationLoop((ms,frame)=>{
   });
   const thrust=Math.min(1,velocity.length()/6);
   craft.position.copy(avatar.position);
-  craft.rotation.copy(ufo.rotation);craft.rotation.y=avatar.rotation.y;
+  craft.quaternion.copy(avatar.quaternion).multiply(ufo.quaternion);
   updateLasers(frame?triggerHeld('right'):moveKeys.has('KeyF'),dt);
   pinStars.position.set(x,avatarHeight,z);
-  const heading=craft.rotation.y;
+  const heading=avatar.rotation.y;
   const speed=Math.max(.001,velocity.length());
   const lateral=(velocity.x*Math.cos(heading)-velocity.z*Math.sin(heading))/speed;
   const ahead=(-velocity.x*Math.sin(heading)-velocity.z*Math.cos(heading))/speed;
