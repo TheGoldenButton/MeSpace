@@ -67725,11 +67725,34 @@ const shockImage=mirrorSceneObject(shock);
 shock.visible=shockImage.visible=false;
 let shockCooldown=0,shockAge=1,shockSerial=0,shockPressed=false;
 const pushNext=new T.Vector3();
+function playShockBlast(){
+  if(!engine || engine.state!=='running')return;
+  const now=engine.currentTime;
+  // The brief upper layer gives the impact definition on smaller speakers.
+  for(const [type,start,body,tail,peak,length] of [
+    ['sine',116,58,37,.24,.72],
+    ['triangle',225,126,85,.068,.34]
+  ]){
+    const voice=engine.createOscillator(),level=engine.createGain();
+    voice.type=type;
+    voice.frequency.setValueAtTime(start,now);
+    voice.frequency.exponentialRampToValueAtTime(body,now+.085);
+    voice.frequency.exponentialRampToValueAtTime(tail,now+length);
+    level.gain.setValueAtTime(.0001,now);
+    level.gain.exponentialRampToValueAtTime(peak,now+.012);
+    level.gain.exponentialRampToValueAtTime(peak*.35,now+length*.45);
+    level.gain.exponentialRampToValueAtTime(.0001,now+length);
+    voice.connect(level).connect(engine.destination);
+    voice.onended=()=>{voice.disconnect();level.disconnect();};
+    voice.start(now);voice.stop(now+length+.01);
+  }
+}
 function updateShock(down,dt){
   const lastSecond=Math.ceil(shockCooldown);
   shockCooldown=Math.max(0,shockCooldown-dt);
   if(down && !shockPressed && !shockCooldown && wave && !finished){
     shock.position.copy(craft.position);shockAge=0;shockCooldown=8;shockSerial++;
+    playShockBlast();
   }
   shockPressed=down;
   if(wave && lastSecond!==Math.ceil(shockCooldown))updateHud();
