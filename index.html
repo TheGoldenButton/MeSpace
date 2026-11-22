@@ -66253,7 +66253,11 @@ const scene = new T.Scene();
 scene.background = new T.Color(0x030511);
 const camera = new T.PerspectiveCamera(54, innerWidth/innerHeight, .045, 3500);
 const rig = new T.Group();
-rig.add(camera);
+// In VR the seated viewpoint needs to move with the ship's pitch, independently
+// of room-scale movement and smooth flight.  The same pivot carries the paws.
+const seatRig = new T.Group();
+rig.add(seatRig);
+seatRig.add(camera);
 scene.add(rig);
 const mirrorZ = -1.65;
 const origin = new T.Vector3();
@@ -66524,6 +66528,10 @@ avatar.name='Conscious Kitty and UFO';
 // Anchor the saucer to the pilot's point of view, not to its geometric center.
 const pilotEyeRest = new T.Vector3(0,.30+.584+.211,-.096-.272);
 const pilotEyeWorld = new T.Vector3();
+const levelPilotEyeWorld = new T.Vector3();
+const seatMotionWorld = new T.Vector3(), seatMotionLocal = new T.Vector3();
+const seatEye = new T.Vector3(), rotatedSeatEye = new T.Vector3();
+const seatYawQuat = new T.Quaternion();
 const ufo = new T.Group();ufo.name='UFO';avatar.add(ufo);
 lathe(ufo,chrome,[[0,-.16],[.21,-.22],[.38,-.18],[.59,-.10],[.74,-.022],[.76,.025],[.72,.08],[.58,.15],[.37,.20],[0,.21]]);
 lathe(ufo,darkMetal,[[0,-.105],[.35,-.105],[.49,-.14],[.41,-.20],[.28,-.25],[0,-.254]]);
@@ -66636,7 +66644,7 @@ for(const s of [-1,1]){
   livePaw.name=s<0?'Tracked left paw':'Tracked right paw';
   livePaw.scale.setScalar(.85);
   livePaw.visible=false;
-  rig.add(livePaw);
+  seatRig.add(livePaw);
   paws.push({hand:s<0?'left':'right',shoulder,rest,foreleg,paw,livePaw});
 
 }
@@ -69035,7 +69043,10 @@ function stopAtMirror(previous,next){
 let drag=null, desktopYaw=0, desktopPitch=Math.atan2(-.21,1.09-mirrorZ);
 const desktopPosition=new T.Vector3(0,1.38,1.09);
 let tiltMode=false,stickWasDown=false,shipPitch=0;
-renderer.xr.addEventListener('sessionend',()=>{tiltMode=false;stickWasDown=false;shipPitch=0;});
+renderer.xr.addEventListener('sessionend',()=>{
+  tiltMode=false;stickWasDown=false;shipPitch=0;
+  seatRig.position.set(0,0,0);seatRig.quaternion.identity();
+});
 const moveKeys=new Set();
 const walkingKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','Space','KeyH','KeyF','KeyY','KeyT']);
 window.addEventListener('keydown',e=>{
@@ -69104,9 +69115,11 @@ button.addEventListener('click',async()=>{
     }else if(micStream)audioContext.resume().catch(()=>{});
     session=await requested;
     anchored=false;velocity.set(0,0,0);
+    seatRig.position.set(0,0,0);seatRig.quaternion.identity();
     session.addEventListener('end',()=>{
       releaseVrMic();
       rig.position.set(0,0,0);rig.rotation.y=0;
+      seatRig.position.set(0,0,0);seatRig.quaternion.identity();
       velocity.set(0,0,0);desktopCamera();
       panel.hidden=false;
       button.disabled=!xrReady;
@@ -69386,7 +69399,8 @@ function slidePaw(point,target,blend,side,limb){
 const restWrist=new T.Quaternion();
 function posePaws(frame,reference,inputs,viewer,dt,t){
   catInverse.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert();
-  trackingToCat.setFromAxisAngle(up,rig.rotation.y).premultiply(catInverse);
+  trackingToCat.setFromAxisAngle(up,rig.rotation.y)
+    .multiply(seatRig.quaternion).premultiply(catInverse);
   catToTracking.copy(trackingToCat).invert();
   eyeAnchor.set(0,eyeHeight,-.272).applyQuaternion(head.quaternion).add(head.position);
   updatePawSolids();
@@ -69562,16 +69576,13 @@ renderer.setAnimationLoop((ms,frame)=>{
       boosting=inputs.find(i=>i.handedness==='left')?.gamepad?.buttons[3]?.pressed;
       fly(rig.position,strafe,tiltMode?0:-lift,walk,view.y+rig.rotation.y,boosting,dt);
       rotatedHead.copy(rawPosition).applyAxisAngle(up,rig.rotation.y).add(rig.position);
+      // Start from the normal tracked eye. Include seat motion before resolving
+      // mirror collisions, so pitching the craft cannot push the eyes through glass.
       nextViewer.set(rotatedHead.x,position.y+rig.position.y,rotatedHead.z);
-      const before=displacement.copy(nextViewer);
-      stopAtMirror(previousViewer,nextViewer);
-      rig.position.sub(before.sub(nextViewer));
-      previousViewer.copy(nextViewer);
       x=nextViewer.x;z=nextViewer.z;
       // Keep the seat anchored through a held lean. Larger room-scale steps carry it along.
       leanWorld.set(position.x,position.y,position.z).sub(torsoTracker).clampLength(0,.24);
       torsoTracker.set(position.x,position.y,position.z).sub(leanWorld);
-      leanWorld.applyAxisAngle(up,rig.rotation.y);
       avatarHeight=position.y+rig.position.y;
       yaw=Math.atan2(Math.sin(view.y+rig.rotation.y),Math.cos(view.y+rig.rotation.y));
       pitch=view.x;
@@ -69596,7 +69607,6 @@ renderer.setAnimationLoop((ms,frame)=>{
     // Mouse look turns the cat's head, not the entire UFO.
     pitch=desktopPitch;
   }
-  reflected.visible=z>mirrorZ;
   if(!viewer)leanWorld.set(0,0,0);
   const delta=T.MathUtils.euclideanModulo(yaw-avatar.rotation.y+Math.PI,2*Math.PI)-Math.PI;
   const neckYaw=T.MathUtils.clamp(delta,-1.05,1.05)*Math.exp(-2.3*dt);
@@ -69604,10 +69614,35 @@ renderer.setAnimationLoop((ms,frame)=>{
   // In VR the right-stick tilt remains a ship maneuver. Looking down with the
   // mouse is only a head/camera movement, so the deck stays beneath the cat.
   ufo.rotation.x=frame?shipPitch:0;
-  // The tracked/desktop camera represents the eyes, which sit ahead of the
-  // saucer's center. Use the same eye-to-hull offset in VR and desktop.
+  // The eye sits forward and above the saucer's center.  When the craft pitches,
+  // its eye/seat position must swing about that center instead of holding still
+  // while the entire UFO pivots around the headset.
   pilotEyeWorld.copy(pilotEyeRest).applyQuaternion(ufo.quaternion)
     .applyQuaternion(avatar.quaternion);
+  if(viewer){
+    levelPilotEyeWorld.copy(pilotEyeRest).applyQuaternion(avatar.quaternion);
+    seatMotionWorld.subVectors(pilotEyeWorld,levelPilotEyeWorld);
+    // Rotate the view about the ship's own transverse axis, not the headset's
+    // current gaze. Convert that rotation into the VR rig's local frame.
+    seatYawQuat.setFromAxisAngle(up,avatar.rotation.y-rig.rotation.y);
+    seatRig.quaternion.copy(seatYawQuat).multiply(ufo.quaternion)
+      .multiply(seatYawQuat.invert());
+    // Pivot about the user's actual tracked eyes, keeping room-scale head
+    // movements precise. Translation adds the changing position of the seat.
+    seatEye.set(viewer.x,viewer.y,viewer.z);
+    rotatedSeatEye.copy(seatEye).applyQuaternion(seatRig.quaternion);
+    seatMotionLocal.copy(seatMotionWorld).applyAxisAngle(up,-rig.rotation.y);
+    seatRig.position.copy(seatEye).sub(rotatedSeatEye).add(seatMotionLocal);
+    // Use the real, pitch-adjusted viewpoint for the hull anchor and collision.
+    nextViewer.add(seatMotionWorld);
+    const before=displacement.copy(nextViewer);
+    stopAtMirror(previousViewer,nextViewer);
+    rig.position.sub(before.sub(nextViewer));
+    previousViewer.copy(nextViewer);
+    x=nextViewer.x;z=nextViewer.z;avatarHeight=nextViewer.y;
+    leanWorld.applyQuaternion(seatRig.quaternion).applyAxisAngle(up,rig.rotation.y);
+  }
+  reflected.visible=z>mirrorZ;
   avatar.position.set(x,avatarHeight,z).sub(pilotEyeWorld).sub(leanWorld);
   // Pitch the gun mounts to follow desktop aim without pitching the whole hull.
   // This also keeps the mirrored and visible copies of the weapons in sync.
@@ -69637,6 +69672,7 @@ renderer.setAnimationLoop((ms,frame)=>{
     // Express the tracked world orientation in the animated neck parent’s frame.
     head.quaternion.copy(avatar.quaternion).multiply(ufo.quaternion).multiply(cat.quaternion).invert()
       .multiply(poseQ.setFromAxisAngle(up,rig.rotation.y))
+      .multiply(seatRig.quaternion)
       .multiply(poseQ.setFromEuler(view));
   }
   const triggerHeld=hand=>!!inputs.find(source=>source.handedness===hand)?.gamepad?.buttons[0]?.pressed;
