@@ -67435,6 +67435,33 @@ const pilots=[
   {fur:0x75574a,ears:.105,height:.12,muzzle:.20},
   {fur:0xb3bacc,ears:.105,height:.19,muzzle:.14}
 ];
+// A fine undercoat catches light between the longer silhouette strands.
+const mouseUndercoat=texture(512,256,(ctx,w,h)=>{
+  ctx.fillStyle='#e3dfdc';ctx.fillRect(0,0,w,h);
+  const random=rng(7031);
+  for(let i=0;i<36000;i++){
+    const x=random()*w,y=random()*h,lean=2*Math.sin(x/w*Math.PI*2);
+    ctx.strokeStyle=random()<.45?'rgba(69,60,63,.20)':'rgba(255,252,247,.62)';
+    ctx.lineWidth=.4+random()*.75;ctx.beginPath();ctx.moveTo(x,y);
+    ctx.quadraticCurveTo(x+lean,y+1,x+lean*1.4,y+2+random()*5);ctx.stroke();
+  }
+  ctx.fillStyle='rgba(227,223,220,.62)';ctx.fillRect(0,0,w,h);
+});
+function detailMouseFur(parent,materials,baseCount){
+  const surfaces=parent.children.filter(p=>p.geometry===sphere && materials.includes(p.material) && p.scale.y>.045);
+  for(const [i,p] of surfaces.entries()){
+    p.material.map=mouseUndercoat;p.material.bumpMap=mouseUndercoat;p.material.bumpScale=.0006;
+    // Keep the fine nap on facial details and where the muscle meshes meet.
+    if(p.name && !['Head','Cheek','Deltoid','Forearm','Calf','Outer ear'].includes(p.name))continue;
+    const area=p.scale.x*p.scale.y+p.scale.y*p.scale.z+p.scale.z*p.scale.x;
+    const fibers=addGuardHairs(parent,'Guard hairs '+p.name,p.position.toArray(),p.scale.toArray(),
+      p.material.color,Math.max(45,Math.round(baseCount*area*.64)),517+i*31,false,Math.min(.27,p.scale.y*.95));
+    if(p.rotation.z){
+      fibers.geometry.translate(-p.position.x,-p.position.y,-p.position.z);
+      fibers.rotation.copy(p.rotation);fibers.position.copy(p.position);
+    }
+  }
+}
 const pilotCream=material(0xffefd7),pilotPatch=material(0x453739);
 const podModels=podStyles.flatMap((style,index)=>pilots.map((pilot,face)=>{
   const podModel=new T.Group();
@@ -67470,8 +67497,109 @@ const podModels=podStyles.flatMap((style,index)=>pilots.map((pilot,face)=>{
     box(podModel,podGlow,0,-.15,.62,.30,.035,.015);
   }
   if(face===0)oval(podModel,pilotPatch,-.11,.315,.20,.095,.058,.070);
+  for(const side of [-1,1]){
+    for(let j=0;j<3;j++)tube(podModel,pilotCream,[[side*.10,.11-j*.011,.39],
+      [side*.22,.12-j*.021,.38],[side*.34,.13-j*.033,.34]],.0028,7);
+    oval(podModel,pilotCream,side*.12-.012,.202,.309,.011,.012,.007);
+    oval(podModel,pilotCream,side*.024,.057,.399,.020,.031,.013);
+  }
+  detailMouseFur(podModel,[mouseFur,pilotPatch,pilotCream],7900);
   return podModel;
 }));
+function makeCommander(){
+  const root=new T.Group();root.name='Mouse Commander';
+  const coat=material(0x62596b,.91),light=material(0xa49aa3,.86),skin=material(0xa06c7a,.89);
+  const muzzle=material(0xd4bdbe,.93),black=material(0x211b26,.86);
+  const eye=material(0xff292e,.27,.1,{emissive:0xeb0614,emissiveIntensity:.85});
+  const gold=material(0xcd9862,.44,.49),cloth=material(0x393044,.93);
+  function joint(parent,name,x,y,z){
+    const part=new T.Group();part.name=name;part.position.set(x,y,z);parent.add(part);return part;
+  }
+  function form(parent,name,mat,x,y,z,w,h,d,tilt=0){
+    const part=oval(parent,mat,x,y,z,w,h,d);part.name=name;part.rotation.z=tilt;return part;
+  }
+  const body=joint(root,'Stride',0,0,0);
+  form(body,'Rib cage',coat,0,.16,-.035,.44,.46,.275);
+  form(body,'Abdomen',coat,0,-.15,.015,.29,.32,.21);
+  form(body,'Flight trunks',cloth,0,-.37,.005,.33,.20,.24);
+  form(body,'Waistband',gold,0,-.29,.015,.322,.047,.236);
+  form(body,'Neck',coat,0,.55,0,.24,.23,.20);
+  form(body,'Head',coat,0,.79,.03,.34,.31,.29);
+  // One fitted surface lets the long top blend into the clipped temples.
+  const hair=material(0x39303a,.55);
+  const hairGeo=new T.BufferGeometry(),vertices=[],indices=[],tints=[];
+  const lanes=176,rows=64;
+  for(let row=0;row<=rows;row++){
+    const v=row/rows;
+    for(let lane=0;lane<=lanes;lane++){
+      const angle=2*Math.PI*lane/lanes;
+      const front=Math.cos(angle),side=Math.sin(angle);
+      const frontal=Math.max(0,front);
+      const curl=Math.exp(-((side+.42)**2)/.027)*frontal**4;
+      const hairline=1.32-.58*front+.13*curl;
+      const phi=.0005+v*hairline;
+      const x=Math.sin(phi)*side,z=Math.sin(phi)*front,y=Math.cos(phi);
+      const partX=.36+.09*z;
+      const groove=Math.exp(-((x-partX)**2)/.0014)*Math.max(0,1.1+z);
+      const crown=Math.max(0,1-(1-y)*1.75);
+      const fade=(1-v*v)**.85;
+      const sweep=Math.sin(52*(x+.43*z+.22*z*z)+1.9*y);
+      const height=fade*crown*(.023+.041*Math.exp(-((x+.22)**2)/.18)+.004*sweep);
+      const offset=.0045+Math.max(0,height*(1-Math.min(1,groove)));
+      vertices.push((.34+offset)*x-.012*fade*crown,.79+(.31+offset)*y,.03+(.29+offset)*z);
+      const clipped=(1-crown)*.31;
+      const value=.78+clipped+.12*sweep*crown+.63*Math.min(1,groove);
+      const tint=Math.min(1,value*.87);
+      tints.push(tint,tint,tint);
+      if(row<rows && lane<lanes){
+        const k=row*(lanes+1)+lane;
+        indices.push(k,k+lanes+1,k+1,k+1,k+lanes+1,k+lanes+2);
+      }
+    }
+  }
+  hairGeo.setAttribute('position',new T.Float32BufferAttribute(vertices,3));
+  hairGeo.setAttribute('color',new T.Float32BufferAttribute(tints,3));
+  hairGeo.setIndex(indices);hairGeo.computeVertexNormals();hair.vertexColors=true;
+  mesh(body,hairGeo,hair,0,0,0).name='Low comb-over with tapered temples';
+
+
+  form(body,'Chin',muzzle,0,.66,.244,.20,.13,.125);
+  for(const side of [-1,1]){
+    const ear=joint(body,'Ear '+side,.283*side,1.02,-.018);ear.rotation.z=-.24*side;
+    form(ear,'Outer ear',coat,0,.05,0,.205,.226,.083);
+    form(ear,'Inner ear',skin,0,.055,.056,.151,.171,.045);
+    form(body,'Cheek',light,.19*side,.75,.17,.16,.175,.134);
+    form(body,'Muzzle',muzzle,.084*side,.754,.309,.13,.102,.145);
+    form(body,'Red eye',eye,.148*side,.849,.277,.078,.052,.044);
+    form(body,'Pupil',black,.143*side,.845,.316,.019,.037,.009);
+    form(body,'Brow',coat,.148*side,.902,.269,.104,.040,.05,.24*side);
+    form(body,'Pectoral',light,.205*side,.323,.177,.255,.176,.142,.12*side);
+    for(let j=0;j<3;j++)form(body,'Abdominal muscle',light,.088*side,.098-.107*j,.194,.094,.074,.058);
+    const arm=joint(body,'Arm '+side,.43*side,.37,0);
+    form(arm,'Deltoid',coat,.012*side,0,0,.207,.202,.215);
+    form(arm,'Biceps',light,.092*side,-.236,.04,.15,.226,.147,.15*side);
+    form(arm,'Forearm',coat,.096*side,-.48,.111,.127,.198,.146);
+    form(arm,'Bracer',cloth,.085*side,-.59,.144,.128,.09,.14);
+    form(arm,'Fist',light,.075*side,-.70,.156,.133,.136,.143);
+    const leg=joint(body,'Leg '+side,.167*side,-.43,0);
+    form(leg,'Thigh',coat,0,-.145,0,.156,.243,.174);
+    form(leg,'Calf',light,.013*side,-.423,-.038,.109,.209,.122);
+    form(leg,'Foot',skin,0,-.608,.084,.117,.073,.196);
+    for(let j=-1;j<=1;j++)form(leg,'Toe',muzzle,j*.052,-.616,.213,.038,.041,.081);
+    for(let j=0;j<3;j++){
+      const w=tube(body,light,[[.145*side,.75-j*.018,.376],[.28*side,.76-j*.024,.37],[.41*side,.78-j*.043,.335]],.004,8);w.name='Whisker';
+    }
+  }
+  form(body,'Nose',black,0,.794,.45,.071,.053,.045);
+  const brush=box(body,black,0,.715,.423,.104,.045,.035);brush.name='Brush moustache';
+  const tail=tube(body,skin,[[0,-.42,-.16],[.12,-.58,-.39],[.34,-.58,-.60],[.52,-.39,-.73],[.49,-.21,-.76]],.038,22);tail.name='Tail';
+  const groomed=[];
+  root.traverse(part=>{if(part.isGroup)groomed.push(part);});
+  for(const group of groomed)detailMouseFur(group,[coat,light,muzzle],11000);
+  return root;
+}
+const commanderModel=makeCommander();
+
 const pods=[];
 let wave=0,hull=9,toLaunch=0,spawnClock=2,finished=false;
 const course=new T.Vector3(), targetDelta=new T.Vector3(), contactDelta=new T.Vector3();
@@ -67497,7 +67625,11 @@ function nextWave(){
     bruteChance=.17+Math.random()*.10;runnerChance=.20+Math.random()*.10;
   }
   waveTempo=runTempo*(.94+Math.random()*.12)*(.92+.08*hull/9);
-  wave++;toLaunch=3+2*wave;spawnClock=2;updateHud();
+  wave++;toLaunch=3+2*wave;spawnClock=2;
+  if(wave===1)launchPod(null,true);
+  const commander=pods.find(p=>p.userData.boss);
+  if(commander)commander.userData.speed=.65+.23*(wave-1);
+  updateHud();
 }
 hud.visible=false;
 const beginWidth=4.95,beginHeight=2.10;
@@ -67551,7 +67683,7 @@ function occludeBehindMirror(shader){
     }`
   );
 }
-for(const root of [sun,pinStars,beginTarget,craft,...podModels]){
+for(const root of [sun,pinStars,beginTarget,craft,commanderModel,...podModels]){
   root.traverse(part=>{if(part.material)part.material.onBeforeCompile=occludeBehindMirror;});
 }
 function shootBegin(ray,start,end){
@@ -67764,7 +67896,7 @@ function updateShock(down,dt){
   pulseMaterial.opacity=shockImage.children[0].material.opacity=.8*(1-shockAge/.65);
   for(const pod of pods){
     const data=pod.userData;
-    if(data.lastShock===shockSerial || pod.position.distanceTo(shock.position)>radius ||
+    if(data.freezeTime>0 || data.lastShock===shockSerial || pod.position.distanceTo(shock.position)>radius ||
       blockedPodPath(shock.position,pod.position,-.88))continue;
     data.lastShock=shockSerial;
     data.recoil=new T.Vector3().subVectors(pod.position,shock.position).normalize();
@@ -67805,15 +67937,15 @@ function updateHum(pod,eye,distance,speed,t){
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden)for(const pod of activeHums.keys())stopHum(pod);
 });
-function launchPod(){
-  const bearing=avatar.rotation.y+(Math.random()-.5)*Math.PI*2;
+function launchPod(commander=null,boss=false){
+  const bearing=avatar.rotation.y+(boss?.25:(Math.random()-.5)*Math.PI*2);
   const variant=Math.floor(Math.random()*podModels.length);
-  const pod=podModels[variant].clone();
+  const pod=(boss?commanderModel:podModels[variant]).clone();
   pod.userData.style=Math.floor(variant/pilots.length);
   pod.userData.speed=waveTempo*(2.6+.46*wave)*podStyles[pod.userData.style].speed*(.86+Math.random()*.28);
   const roll=Math.random();
-  const brute=wave>=3 && roll<bruteChance;
-  const sprinter=wave>=4 && roll>=bruteChance && roll<bruteChance+runnerChance;
+  const brute=!boss && !commander && wave>=3 && roll<bruteChance;
+  const sprinter=!boss && !commander && wave>=4 && roll>=bruteChance && roll<bruteChance+runnerChance;
   pod.userData.hz=runTone*podStyles[pod.userData.style].tone*(.68+Math.random()*.26)*(brute?.68:sprinter?1.4:1);
   pod.userData.wobble=6+Math.random()*11;
   pod.userData.humPhase=Math.random()*Math.PI*2;
@@ -67823,14 +67955,32 @@ function launchPod(){
   pod.userData.sparkClock=0;
   if(brute){pod.scale.setScalar(bruteScale);pod.userData.speed*=.76;}
   if(sprinter){pod.scale.set(.83,.83,1.18);pod.userData.speed*=2.65;}
+  if(boss){
+    pod.userData.boss=true;pod.userData.hp=12;pod.userData.freezeTime=0;pod.userData.padding=brutePadding;
+    pod.scale.setScalar(1.45);pod.userData.speed=1.65+.08*wave;
+    pod.userData.swarmClock=1.4;pod.userData.stride=0;
+  }
   pod.userData.soundClock=.2+Math.random()*.5;
-  course.set(-Math.sin(bearing),(Math.random()-.5)*.65,-Math.cos(bearing)).normalize();
+  course.set(-Math.sin(bearing),boss?.025:(Math.random()-.5)*.65,-Math.cos(bearing)).normalize();
   pod.position.copy(craft.position).addScaledVector(course,23+Math.random()*9);
+  if(commander){
+    pod.position.copy(commander.position).addScaledVector(course,1.9);
+    pod.userData.summoned=true;
+  }
   if(blockedPodPath(pod.position,pod.position,pod.userData.padding))pod.position.x=podBarrierMax.x+pod.userData.padding+.25;
   pod.userData.mirrorImage=mirrorSceneObject(pod);
-  pods.push(pod);scene.add(pod);toLaunch--;
+  pods.push(pod);scene.add(pod);if(!boss)toLaunch--;
+}
+function setCommanderFrozen(pod,frozen){
+  for(const actor of [pod,pod.userData.mirrorImage]){
+    actor.traverse(part=>{
+      if(part.name==='Red eye')part.material.emissive.setHex(frozen?0x69e9ff:0xeb0614);
+      if(part.name==='Pectoral' || part.name==='Calf')part.material.emissive.setHex(frozen?0x234457:0);
+    });
+  }
 }
 function removePod(index){
+  if(pods[index].userData.boss)setCommanderFrozen(pods[index],false);
   stopHum(pods[index]);
   pods[index].userData.mirrorImage.removeFromParent();
   pods[index].removeFromParent();pods.splice(index,1);
@@ -67849,7 +67999,7 @@ function hitPod(ray,start,end,damage=1){
       contactDelta.subVectors(pods[i].position,leg?ray.contact:ray.origin);
       const along=contactDelta.dot(dir);
       const radial=contactDelta.lengthSq()-along*along;
-      const radius=.56*pods[i].scale.x+ray.radius;
+      const radius=(pods[i].userData.boss?.95:.56)*pods[i].scale.x+ray.radius;
       if(radial>radius*radius)continue;
       const half=Math.sqrt(radius*radius-radial),offset=leg?ray.hit:0;
       const entry=Math.max(low,offset+along-half);
@@ -67859,7 +68009,14 @@ function hitPod(ray,start,end,damage=1){
   if(first>=0){
     const pod=pods[first],direction=hitLeg?ray.outgoing:ray.direction;
     laserImpact.copy(hitLeg?ray.contact:ray.origin).addScaledVector(direction,best-(hitLeg?ray.hit:0));
+    if(pod.userData.freezeTime>0)return best;
     pod.userData.hp-=pod.userData.padding?damage:1;
+    if(pod.userData.boss && pod.userData.hp<=.000001){
+      pod.userData.freezeTime=5;pod.userData.hp=12;
+      pod.userData.recoilTime=0;pod.userData.boostTime=0;
+      setCommanderFrozen(pod,true);burstPod(pod,laserImpact,direction,false);
+      return best;
+    }
     if(pod.userData.hp<=.000001){
       burstPod(pod,laserImpact,direction,true);podSound(pod,true);removePod(first);
     }else if(pod.userData.sparkClock<=0){
@@ -67886,6 +68043,11 @@ function updateWave(dt,t,down){
     const pod=pods[i];
     targetDelta.subVectors(craft.position,pod.position);
     const data=pod.userData;
+    if(data.freezeTime>0){
+      data.freezeTime=Math.max(0,data.freezeTime-dt);
+      if(!data.freezeTime)setCommanderFrozen(pod,false);
+      continue;
+    }
     if(data.recoilTime>0){
       pushNext.copy(pod.position).addScaledVector(data.recoil,dt*(4+14*data.recoilTime/.56));
       if(!blockedPodPath(pod.position,pushNext,data.padding))pod.position.copy(pushNext);
@@ -67908,7 +68070,7 @@ function updateWave(dt,t,down){
     updateHum(pod,eye,distance,speedFactor,t);
     const direct=steerPod(pod,craft.position);
     if((direct || !blockedPodPath(pod.position,craft.position)) && distance<=.85*pod.scale.x+travel){
-      removePod(i);hull--;finished=hull===0;updateHud();
+      hull=data.boss?0:hull-1;removePod(i);finished=hull===0;updateHud();
       if(finished){while(pods.length)removePod(pods.length-1);break;}
       continue;
     }
@@ -67921,7 +68083,25 @@ function updateWave(dt,t,down){
     targetDelta.subVectors(waypoint,pod.position);
     const remaining=targetDelta.length();
     if(remaining>.0001){
-      pod.lookAt(waypoint);
+      if(data.boss){
+        pod.rotation.y=Math.atan2(targetDelta.x,targetDelta.z);
+        data.stride+=Math.min(travel,remaining)*3.8;
+        const gait=Math.sin(data.stride);
+        for(const actor of [pod,data.mirrorImage]){
+          const body=actor.children[0];
+          body.position.y=.045*Math.abs(gait);
+          for(const side of [-1,1]){
+            body.getObjectByName('Leg '+side).rotation.x=side*gait*.56;
+            body.getObjectByName('Arm '+side).rotation.x=-side*gait*.42;
+          }
+        }
+        data.swarmClock-=dt;
+        if(toLaunch && data.swarmClock<=0 && pods.filter(other=>other.userData.summoned).length<=5){
+          const count=Math.min(toLaunch,3);
+          for(let j=0;j<count;j++)launchPod(pod);
+          data.swarmClock=6;
+        }
+      }else pod.lookAt(waypoint);
       pod.position.addScaledVector(targetDelta,Math.min(travel/remaining,1));
     }
     sight.copy(pod.position).applyMatrix4(eye.matrixWorldInverse);
@@ -67941,7 +68121,7 @@ function updateWave(dt,t,down){
     warning.rotation.z=angle-Math.PI/2;
     warning.material.color.setHex(Math.sin(t*10)>0?0xff3030:0x700b14);
   }
-  if(!finished && !toLaunch && !pods.length)nextWave();
+  if(!finished && !toLaunch && !pods.some(p=>!p.userData.boss))nextWave();
 }
 
 const meter=new T.Group();craft.add(meter);meter.position.set(0,.05,-2.8);
