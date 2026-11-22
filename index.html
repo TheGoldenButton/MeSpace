@@ -67782,9 +67782,10 @@ function paintShopBack(){
 }
 let selection=0,wasShop=false,wasNext=false,wasBuy=false,shopNotice='',shopVR=false;
 let desktopSummon=false,toadPhase='away',phaseTime=0,toadHeight=0,toadSpeed=0;
-// Any rear-haunch slap starts a short angry turn toward the actual viewer.
-// Keep the angle in state so it turns smoothly rather than snapping 180 degrees.
-let toadGlareRemaining=0,toadGlareIntensity=0,toadFacingYaw=.19;
+// Any first paw touch makes the Dream Toad turn toward the viewer.
+// A fast haunch smack creates a stronger reaction, but no speech bubble.
+// Keep the yaw independent and speed-limited so the turn is deliberately slow.
+let toadGlareRemaining=0,toadGlareIntensity=0,toadReactionStrength=0,toadFacingYaw=.19;
 const haunchSprings=dreamToad.children.filter(p=>p.name==='Grand haunch').map(p=>({
   p,rest:p.position.clone(),scale:p.scale.clone(),offset:0,speed:0
 }));
@@ -67936,11 +67937,15 @@ function animateVisitor(dt,t){
   if(leaving)dreamToad.position.set(leaveFrom.x-2.1*depart-.38*Math.sin(Math.PI*depart),height,leaveFrom.z-5.3*depart);
   else dreamToad.position.set(-.36-2.5*approach+.32*driftBeat*Math.sin(2*Math.PI*u)+.009*Math.sin(t*.71),height,-1.55-5.4*approach);
   keepVisitorClear(dreamToad.position);
-  if(leaving){toadGlareRemaining=0;}
-  else toadGlareRemaining=Math.max(0,toadGlareRemaining-dt);
+  if(leaving){toadGlareRemaining=0;toadReactionStrength=0;}
+  else{
+    toadGlareRemaining=Math.max(0,toadGlareRemaining-dt);
+    if(toadGlareRemaining===0)toadReactionStrength=0;
+  }
   const angry=!leaving && toadGlareRemaining>0;
-  toadGlareIntensity+=(Number(angry)-toadGlareIntensity)*
-    (1-Math.exp(-(angry?6:2.7)*dt));
+  const glareGoal=angry?toadReactionStrength:0;
+  toadGlareIntensity+=(glareGoal-toadGlareIntensity)*
+    (1-Math.exp(-(angry?3.4:2.7)*dt));
   const neutralYaw=.19+.15*approach;
   let desiredYaw=leaving?leaveYaw-2.76*ease(u,0,.47):neutralYaw;
   if(angry){
@@ -67957,7 +67962,10 @@ function animateVisitor(dt,t){
   else{
     let delta=Math.atan2(Math.sin(desiredYaw-toadFacingYaw),Math.cos(desiredYaw-toadFacingYaw));
     if(Math.abs(Math.abs(delta)-Math.PI)<.0001)delta=Math.PI;
-    toadFacingYaw+=delta*(1-Math.exp(-(angry?5.6:2.9)*dt));
+    // During contact, turn at no more than ~66 degrees per second instead
+    // of snapping around. The exponential step eases into the final pose.
+    const step=delta*(1-Math.exp(-(angry?1.15:2.9)*dt));
+    toadFacingYaw+=angry?T.MathUtils.clamp(step,-1.15*dt,1.15*dt):step;
   }
   dreamToad.rotation.set(.014*breath+.09*stroke+.06*toadGlareIntensity,
     toadFacingYaw,
@@ -67987,7 +67995,9 @@ function animateVisitor(dt,t){
     const step=leaving?Math.sin(phaseTime*5.3)*side*ease(u,0,.17):0;
     p.position.y=y+.05*Math.max(0,step);p.position.z=z+.085*step;
   }
-  sign.visible=!leaving && (!arriving||u>.7);
+  // No speech/shop bubble during the touch-and-glare reaction. Restore the
+  // regular shop panel (and its mirrored reverse) once he calms down.
+  sign.visible=!leaving && (!arriving||u>.7) && !angry;
   shopMat.opacity=arriving?ease(u,.7,.96):1;
   shopBackMat.opacity=shopMat.opacity;
   for(const h of haunchSprings){
@@ -68106,7 +68116,7 @@ function shopInput(toggle,next,buy,vr,t,dt){
   if(toggled && toadPhase!=='leaving'){
     if(toadPhase==='away'){
       anchorVisitor();toadPhase='arriving';phaseTime=0;toadHeight=.59;toadSpeed=0;
-      toadGlareRemaining=toadGlareIntensity=0;toadFacingYaw=.19;
+      toadGlareRemaining=toadGlareIntensity=toadReactionStrength=0;toadFacingYaw=.19;
       bazaar.visible=sign.visible=true;hud.visible=warning.visible=false;
       stopFire();meter.visible=false;for(const pod of pods)stopHum(pod);
       summonChime();shopNotice='';selection=0;paintShop();
@@ -69284,14 +69294,21 @@ function avoidAnimalPenetration(point,limb){
     // Reserve a tiny skin clearance to avoid flicker at grazing angles.
     animalTestWorld.copy(animalPushWorld);
     collided=true;
-    if(solid.spring)limb.touchedHaunch=solid.spring;
-    else if(solid.kind==='mouse')limb.touchedMouse=solid.actor;
+    if(solid.kind==='frog'){
+      // All skin and limbs can be touched, not just the haunches.
+      limb.touchedFrog=true;
+      if(solid.spring)limb.touchedHaunch=solid.spring;
+    }else if(solid.kind==='mouse')limb.touchedMouse=solid.actor;
   }
   if(collided)point.copy(animalTestWorld).applyMatrix4(worldToPaw);
   return collided;
 }
 function finishAnimalContact(limb,goal,dt){
-  if(!limb.tracked){limb.previousContactHaunch=null;limb.previousContactMouse=null;return;}
+  if(!limb.tracked){
+    limb.previousContactHaunch=null;limb.previousContactMouse=null;
+    limb.frogTouchGap=1;limb.previousAnimalTarget=null;
+    return;
+  }
   animalTargetWorld.copy(goal).applyMatrix4(pawToWorld);
   const speed=limb.previousAnimalTarget && dt>.0001?
     animalTargetWorld.distanceTo(limb.previousAnimalTarget)/dt:0;
@@ -69299,17 +69316,27 @@ function finishAnimalContact(limb,goal,dt){
   limb.previousAnimalTarget.copy(animalTargetWorld);
   limb.impactCooldown=Math.max(0,(limb.impactCooldown||0)-dt);
   const h=limb.touchedHaunch;
-  if(h && speed>.10 && (h!==limb.previousContactHaunch ||
-      (speed>1.25 && limb.impactCooldown<=0))){
-    const impulse=Math.min(3.7,.40+speed*.95);
-    h.speed+=impulse;
-    // A real hand-to-haunch impact (not the passive bob) triggers his
-    // annoyed turn and keeps him glaring for several seconds.
-    if(toadPhase==='shopping' || toadPhase==='arriving')
-      toadGlareRemaining=4.8;
-    // A little opposite-haunch wobble lets a slap ripple through the frog.
-    for(const other of haunchSprings)if(other!==h)other.speed-=impulse*.18;
-    limb.impactCooldown=.11;
+  const touchingFrog=!!limb.touchedFrog;
+  // Brief contact jitter doesn't count as a fresh touch. Once the hand has
+  // been off the toad for 0.2s, touching again gets a new reaction.
+  const gap=limb.frogTouchGap??1;
+  const freshTouch=touchingFrog && gap>.20;
+  limb.frogTouchGap=touchingFrog?0:Math.min(1,gap+dt);
+  const smack=!!h && speed>1.25 && limb.impactCooldown<=0;
+  if(touchingFrog && (freshTouch || smack)){
+    const impulse=smack?Math.min(3.7,.40+speed*.95):.29;
+    if(h){
+      h.speed+=impulse;
+      for(const other of haunchSprings)if(other!==h)other.speed-=impulse*.18;
+    }else{
+      // Gentle contact on the head, belly or feet still gets a small squirm.
+      for(const other of haunchSprings)other.speed+=.12;
+    }
+    if(toadPhase==='shopping' || toadPhase==='arriving'){
+      toadGlareRemaining=Math.max(toadGlareRemaining,smack?5.7:4.8);
+      toadReactionStrength=Math.max(toadReactionStrength,smack?1:.65);
+    }
+    limb.impactCooldown=smack?.14:.25;
   }
   const mouse=limb.touchedMouse;
   if(mouse && speed>.2 && mouse!==limb.previousContactMouse){
@@ -69366,7 +69393,7 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
   prepareAnimalContacts();
   const blend=1-Math.exp(-23*dt);
   for(const limb of paws){
-    limb.touchedHaunch=null;limb.touchedMouse=null;
+    limb.touchedFrog=false;limb.touchedHaunch=null;limb.touchedMouse=null;
     const side=Math.sign(limb.shoulder.x);
     const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):vrShoulder.copy(limb.shoulder);
     followSpine(shoulder);
