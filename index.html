@@ -35,7 +35,7 @@ button:hover:not(:disabled),summary:hover{border-color:#a1f4df;background:#35455
 <tr><td>Aim / tilt</td><td>Drag to aim</td><td>Right stick / click for tilt</td></tr>
 <tr><td>Altitude</td><td>E / Q</td><td>Right stick up / down</td></tr>
 <tr><td>Laser</td><td>F</td><td>Right trigger</td></tr>
-<tr><td>Special</td><td>Y</td><td>Left Y</td></tr>
+<tr><td>Special weapon</td><td>Y</td><td>Left trigger</td></tr>
 <tr><td>Dream Toad</td><td>T</td><td>Left X</td></tr>
 <tr><td>Spiral eyes</td><td>Hold H</td><td>Hold B</td></tr></tbody></table>
 <p>Shoot the START sign to begin.</p></article></details>
@@ -66255,8 +66255,11 @@ const camera = new T.PerspectiveCamera(54, innerWidth/innerHeight, .045, 3500);
 const rig = new T.Group();
 // In VR the seated viewpoint needs to move with the ship's pitch, independently
 // of room-scale movement and smooth flight.  The same pivot carries the paws.
+// A true world-space cinematic dolly, not a floating video screen in VR.
+const introView = new T.Group();
+rig.add(introView);
 const seatRig = new T.Group();
-rig.add(seatRig);
+introView.add(seatRig);
 seatRig.add(camera);
 scene.add(rig);
 const mirrorZ = -1.65;
@@ -67549,7 +67552,7 @@ const podModels=podStyles.flatMap((style,index)=>pilots.map((pilot,face)=>{
   return podModel;
 }));
 function makeCommander(){
-  const root=new T.Group();root.name='Mouse Commander';
+  const root=new T.Group();root.name='Übermouse';
   const coat=material(0x62596b,.91),light=material(0xa49aa3,.86),skin=material(0xa06c7a,.89);
   const muzzle=material(0xd4bdbe,.93),black=material(0x211b26,.86);
   const eye=material(0xff292e,.27,.1,{emissive:0xeb0614,emissiveIntensity:.85});
@@ -67757,11 +67760,11 @@ function gatherKarma(dt,t){
 }
 const bazaar=new T.Group();scene.add(bazaar);bazaar.visible=false;
 const dreamToad=makeDreamToad();bazaar.add(dreamToad);
-dreamToad.position.set(-.36,-.27,-1.55);dreamToad.scale.setScalar(.27);
+dreamToad.position.set(-.36,-.27,-.92);dreamToad.scale.setScalar(.27);
 const shopCanvas=document.createElement('canvas');shopCanvas.width=800;shopCanvas.height=680;
 const shopMap=new T.CanvasTexture(shopCanvas);shopMap.colorSpace=T.SRGBColorSpace;
 const shopMat=new T.MeshBasicMaterial({map:shopMap,toneMapped:false,transparent:true,depthTest:true,depthWrite:false});
-const sign=mesh(bazaar,new T.PlaneGeometry(.77,.655),shopMat,.24,.035,-1.52);sign.renderOrder=96;
+const sign=mesh(bazaar,new T.PlaneGeometry(.77,.655),shopMat,.62,.045,-1.04);sign.renderOrder=96;
 // The shop bubble is a physical two-sided object: its reverse is an opaque,
 // text-free back panel with the same cutout as the live text on its front.
 // Parenting it to the sign ensures the mirrored bazaar includes the back too.
@@ -67795,7 +67798,8 @@ let desktopSummon=false,toadPhase='away',phaseTime=0,toadHeight=0,toadSpeed=0;
 // Keep the yaw independent and speed-limited so the turn is deliberately slow.
 let toadGlareRemaining=0,toadGlareIntensity=0,toadReactionStrength=0,toadFacingYaw=.19;
 const haunchSprings=dreamToad.children.filter(p=>p.name==='Grand haunch').map(p=>({
-  p,rest:p.position.clone(),scale:p.scale.clone(),offset:0,speed:0
+  p,rest:p.position.clone(),scale:p.scale.clone(),offset:0,speed:0,
+  sway:0,swaySpeed:0,squish:0,squishSpeed:0,pressure:0
 }));
 for(const h of haunchSprings){
   const pearls=dreamToad.children.filter(p=>p.name==='Raised skin pearl' && Math.sign(p.position.x)===Math.sign(h.rest.x));
@@ -67916,12 +67920,12 @@ function anchorVisitor(){
   bazaar.updateMatrixWorld(true);
   visitSide=bazaar.position.z>=mirrorZ?1:-1;
   // Include the full approach and retreat, including an early dismissal.
-  const hover=bazaar.localToWorld(new T.Vector3(-.36,-.27,-1.55));
+  const hover=bazaar.localToWorld(new T.Vector3(-.36,-.27,-.92));
   const far=bazaar.localToWorld(new T.Vector3(-4.96,1.16,-12.25));
   nearMirrorVisit=blockedPodPath(bazaar.position,hover,.12) || blockedPodPath(hover,far,.12);
   visitSideways.set(-1,0,0).applyQuaternion(bazaar.quaternion);
   slideSign=visitSideways.x>=0?1:-1;
-  sign.position.set(.24,.035,-1.52);keepVisitorClear(sign.position);
+  sign.position.set(.62,.045,-1.04);keepVisitorClear(sign.position);
 }
 function animateVisitor(dt,t){
   phaseTime+=dt;
@@ -67943,7 +67947,7 @@ function animateVisitor(dt,t){
   const kick=T.MathUtils.clamp(speed-toadSpeed,-.5,.5);
   toadHeight=height;toadSpeed=speed;
   if(leaving)dreamToad.position.set(leaveFrom.x-2.1*depart-.38*Math.sin(Math.PI*depart),height,leaveFrom.z-5.3*depart);
-  else dreamToad.position.set(-.36-2.5*approach+.32*driftBeat*Math.sin(2*Math.PI*u)+.009*Math.sin(t*.71),height,-1.55-5.4*approach);
+  else dreamToad.position.set(-.36-2.5*approach+.32*driftBeat*Math.sin(2*Math.PI*u)+.009*Math.sin(t*.71),height,-.92-5.4*approach);
   keepVisitorClear(dreamToad.position);
   if(leaving){toadGlareRemaining=0;toadReactionStrength=0;}
   else{
@@ -68009,22 +68013,34 @@ function animateVisitor(dt,t){
   shopMat.opacity=arriving?ease(u,.7,.96):1;
   shopBackMat.opacity=shopMat.opacity;
   for(const h of haunchSprings){
-    // Takeoff and alternate paddle strokes load each haunch slightly differently.
+    // Soft three-axis spring with continuous contact pressure. Gentle resting
+    // touches deform the haunch; quick taps add momentum and wobble afterward.
     const drive=leaving?.065*Math.sin(Math.PI*u)*Math.sin(phaseTime*6.1+Math.sign(h.rest.x)*.35):0;
-    h.speed-=kick*.94;
-    // Continuous damped spring: every hand slap adds velocity that remains
-    // active after contact and settles naturally instead of resetting each frame.
-    const springSteps=Math.max(1,Math.ceil(dt/.010));
-    for(let j=0;j<springSteps;j++){
-      const hdt=dt/springSteps;
-      h.speed+=(86*(drive-h.offset)-6.8*h.speed)*hdt;
+    const press=h.pressure;
+    const bounceGoal=drive+.048*press;
+    const swayGoal=Math.sign(h.rest.x)*(.125*press);
+    const squashGoal=.13*press;
+    h.speed-=kick*.62;
+    const steps=Math.max(1,Math.ceil(dt/.006));
+    for(let j=0;j<steps;j++){
+      const hdt=dt/steps;
+      h.speed+=(54*(bounceGoal-h.offset)-4.6*h.speed)*hdt;
       h.offset+=h.speed*hdt;
-      if(h.offset>.14){h.offset=.14;h.speed=Math.min(0,h.speed)*.42;}
-      if(h.offset<-.14){h.offset=-.14;h.speed=Math.max(0,h.speed)*.42;}
+      h.swaySpeed+=(46*(swayGoal-h.sway)-4.8*h.swaySpeed)*hdt;
+      h.sway+=h.swaySpeed*hdt;
+      h.squishSpeed+=(72*(squashGoal-h.squish)-5.5*h.squishSpeed)*hdt;
+      h.squish+=h.squishSpeed*hdt;
+      for(const [key,speed,limit] of [['offset','speed',.27],['sway','swaySpeed',.24],['squish','squishSpeed',.23]]){
+        if(h[key]>limit){h[key]=limit;h[speed]=Math.min(0,h[speed])*.57;}
+        if(h[key]<-limit){h[key]=-limit;h[speed]=Math.max(0,h[speed])*.57;}
+      }
     }
-    h.p.position.z=h.rest.z-.46*h.offset;h.p.position.y=h.rest.y+h.offset;h.p.scale.y=h.scale.y*(1+h.offset*.7);
-    h.p.scale.z=h.scale.z*(1-h.offset*.42);
+    h.p.position.set(h.rest.x+h.sway,h.rest.y+.68*h.offset,h.rest.z-.34*h.offset-.20*h.squish);
+    h.p.scale.set(h.scale.x*(1+.48*h.squish),
+      h.scale.y*(1-.43*h.squish+.24*h.offset),
+      h.scale.z*(1+.30*h.squish-.11*h.offset));
     for(const bead of h.pearls){
+      bead.p.position.x=h.p.position.x+(bead.rest.x-h.rest.x)*h.p.scale.x/h.scale.x;
       bead.p.position.y=h.p.position.y+(bead.rest.y-h.rest.y)*h.p.scale.y/h.scale.y;
       bead.p.position.z=h.p.position.z+(bead.rest.z-h.rest.z)*h.p.scale.z/h.scale.z;
     }
@@ -68250,14 +68266,48 @@ function tickSpeech(dt){
   }
 }
 const openingLine='The Conscious Kitty is evil, destroy it now!';
-const shotCamera=new T.PerspectiveCamera(43,1,.045,3500);
-const filmTarget=new T.WebGLRenderTarget(960,600);
-const film=mesh(camera,new T.PlaneGeometry(1.36,.85),new T.MeshBasicMaterial({
-  map:filmTarget.texture,depthTest:false,depthWrite:false,toneMapped:false}),0,0,-1.25);
-film.renderOrder=150;film.visible=false;
+const shotCamera=new T.PerspectiveCamera(54,1,.045,3500);
+// In-world 10-second frozen-start label. It appears at the spawn point, and
+// the same live texture is clipped into the mirror like the mice's speech.
+const startCanvas=document.createElement('canvas');
+startCanvas.width=768;startCanvas.height=256;
+const startInk=startCanvas.getContext('2d');
+const startMap=new T.CanvasTexture(startCanvas);startMap.colorSpace=T.SRGBColorSpace;
+const startSign=new T.Sprite(new T.SpriteMaterial({map:startMap,transparent:true,
+  depthWrite:false,toneMapped:false}));
+scene.add(startSign);startSign.scale.set(4.5,1.5,1);startSign.visible=false;
+const mirroredStartSign=mirrorSceneObject(startSign);
+let startFreeze=0,startLastSecond=-1;
+const introFocus=new T.Vector3(),introBaseEye=new T.Vector3(),introBaseLocal=new T.Vector3();
+const introTargetLocal=new T.Vector3();
+let introHead=null;
 let introBoss=null,introTime=0;
+function drawStartCountdown(seconds){
+  const c=startInk;c.clearRect(0,0,768,256);
+  c.fillStyle='rgba(25,13,38,.90)';c.beginPath();c.roundRect(24,22,720,211,32);c.fill();
+  c.strokeStyle='#ff9ea4';c.lineWidth=7;c.stroke();
+  c.textAlign='center';c.textBaseline='middle';
+  c.font='bold 62px system-ui';c.fillStyle='#fff0cc';c.fillText('Übermouse',384,88);
+  c.font='bold 78px system-ui';c.fillStyle='#b9fff3';c.fillText('Frozen · '+seconds,384,176);
+  startMap.needsUpdate=true;
+}
+function tickStartCountdown(dt){
+  if(startFreeze<=0 || !wave || finished)return;
+  const boss=pods.find(p=>p.userData.boss);
+  startFreeze=Math.max(0,startFreeze-dt);
+  if(boss){
+    boss.userData.freezeTime=startFreeze;
+    startSign.position.copy(boss.position).add(new T.Vector3(0,3.3,0));
+    startSign.updateMatrix();
+  }
+  const second=Math.ceil(startFreeze);
+  if(second!==startLastSecond){startLastSecond=second;if(second>0)drawStartCountdown(second);}
+  startSign.visible=second>0 && !!boss;
+  mirroredStartSign.visible=startSign.visible;
+  if(second===0 && boss)setCommanderFrozen(boss,false);
+}
 function beginIntro(actor){
-  introBoss=actor;introTime=0;chatterWait=4;
+  introBoss=actor;introTime=0;chatterWait=4;introView.position.set(0,0,0);
   actor.rotation.y=Math.atan2(craft.position.x-actor.position.x,craft.position.z-actor.position.z);
   for(const body of [actor,actor.userData.mirrorImage]){
     const arm=body.getObjectByName('Arm 1');
@@ -68287,21 +68337,29 @@ function tickIntro(dt){
     }
     body.getObjectByName('Red eye').material.emissiveIntensity=.85+reach*(2.2+3*Math.exp(-((introTime-1.4)**2)/.13));
   }
-  const zoom=ease(introTime,0,2.1);
-  shotCamera.position.set(.26+.26*(1-zoom),.95,10.5-5.15*zoom).applyQuaternion(introBoss.quaternion).add(introBoss.position);
-  shotCamera.lookAt(introBoss.position.x,introBoss.position.y+.88,introBoss.position.z);
-  shotCamera.aspect=renderer.xr.isPresenting?1.6:camera.aspect;shotCamera.updateProjectionMatrix();
+  // Dolly the actual stereo viewpoint toward the real mouse spawn point.
+  // It eases back to the cat before the player gains control; headset pitch,
+  // yaw, eye separation and head movement remain tracked in WebXR.
+  const zoom=ease(introTime,.12,2.25)*(1-ease(introTime,3.25,6.05));
+  introFocus.set(.12,1.56,4.0).applyQuaternion(introBoss.quaternion).add(introBoss.position);
+  if(renderer.xr.isPresenting && introHead){
+    rig.updateWorldMatrix(true,false);
+    introBaseLocal.copy(introHead).applyQuaternion(seatRig.quaternion).add(seatRig.position);
+    introBaseEye.copy(introBaseLocal).applyMatrix4(rig.matrixWorld);
+    introTargetLocal.copy(introFocus);
+    rig.worldToLocal(introTargetLocal);
+    introView.position.copy(introTargetLocal).sub(introBaseLocal).multiplyScalar(zoom);
+  }else introView.position.set(0,0,0);
+  shotCamera.position.copy(desktopPosition).lerp(introFocus,zoom);
+  shotCamera.lookAt(introBoss.position.x,introBoss.position.y+.90,introBoss.position.z);
+  shotCamera.aspect=camera.aspect;shotCamera.updateProjectionMatrix();
   tickSpeech(dt);
-  if(introTime>=4.6){silenceSpeaker(introBoss);introBoss=null;film.visible=false;blockFire=true;hud.visible=true;}
+  if(introTime>=6.1){
+    silenceSpeaker(introBoss);introBoss=null;introView.position.set(0,0,0);
+    blockFire=true;hud.visible=true;
+  }
 }
-function renderOpening(){
-  if(!renderer.xr.isPresenting){renderer.render(scene,shotCamera);return;}
-  const target=renderer.getRenderTarget(),xr=renderer.xr;
-  film.visible=false;
-  try{xr.enabled=false;renderer.setRenderTarget(filmTarget);renderer.render(scene,shotCamera);}
-  finally{renderer.setRenderTarget(target);xr.enabled=true;}
-  film.visible=true;renderer.render(scene,camera);
-}
+function renderOpening(){renderer.render(scene,renderer.xr.isPresenting?camera:shotCamera);}
 function nextWave(){
   if(!wave){
     Object.assign(loadout,{karma:0,laser:0,cooling:0,arc:false,special:'Shockwave'});
@@ -68314,7 +68372,14 @@ function nextWave(){
   wave++;toLaunch=3+2*wave;spawnClock=2;
   if(wave===1)launchPod(null,true);
   const commander=pods.find(p=>p.userData.boss);
-  if(wave===1){beginIntro(commander);hud.visible=false;}
+  if(wave===1 && commander){
+    startFreeze=10;startLastSecond=-1;commander.userData.freezeTime=10;
+    setCommanderFrozen(commander,true);
+    startSign.position.copy(commander.position).add(new T.Vector3(0,3.3,0));
+    startSign.updateMatrix();
+    drawStartCountdown(10);startSign.visible=mirroredStartSign.visible=true;
+    beginIntro(commander);hud.visible=false;
+  }
   if(commander)commander.userData.speed=.65+.23*(wave-1);
   updateHud();
 }
@@ -68768,6 +68833,8 @@ function drawEnd(){
 function endAction(replay){
   if(!finished)return;
   finished=false;wave=0;hull=9;blockFire=true;showedDeath=false;
+  startFreeze=0;startLastSecond=-1;startSign.visible=mirroredStartSign.visible=false;
+  introBoss=null;introView.position.set(0,0,0);
   endCard.visible=false;deathPanel.hidden=true;
   stopFire();while(bolts.length){const b=bolts.pop();b.group.removeFromParent();b.mirrorBeam.removeFromParent();}
   while(drops.length)drops.pop().removeFromParent();while(pods.length)removePod(pods.length-1);
@@ -68797,6 +68864,8 @@ function updateWave(dt,t,down){
   updateBursts(dt);
   if(beginTarget.visible)return;
   if(finished)return;
+  // Keep Übermouse and the battlefield stationary during the opening 10 seconds.
+  if(startFreeze>0){warning.visible=false;return;}
   spawnClock-=dt;
   if(toLaunch && spawnClock<=0){launchPod();spawnClock=Math.max(.32,2.5/(waveTempo*(1+.14*wave)));}
   const eye=renderer.xr.isPresenting?(renderer.xr.getCamera().cameras[0]||camera):camera;
@@ -69046,6 +69115,7 @@ let tiltMode=false,stickWasDown=false,shipPitch=0;
 renderer.xr.addEventListener('sessionend',()=>{
   tiltMode=false;stickWasDown=false;shipPitch=0;
   seatRig.position.set(0,0,0);seatRig.quaternion.identity();
+  introView.position.set(0,0,0);
 });
 const moveKeys=new Set();
 const walkingKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','KeyQ','KeyE','Space','KeyH','KeyF','KeyY','KeyT']);
@@ -69097,7 +69167,7 @@ async function detectXR(){
   try{xrReady=!!(navigator.xr && await navigator.xr.isSessionSupported('immersive-vr'));}
   catch{xrReady=false;}
   button.disabled=!xrReady;
-  status.textContent=xrReady?'Select Enter VR in your headset. Hold the left stick in to boost, hold B for spiral eyes, and tap or hold right trigger to fire.':previewHelp+' · VR requires a WebXR headset browser.';
+  status.textContent=xrReady?'Select Enter VR in your headset. Left trigger uses your special weapon; right trigger fires lasers.':previewHelp+' · VR requires a WebXR headset browser.';
 }
 button.addEventListener('click',async()=>{
   button.disabled=true;
@@ -69123,7 +69193,7 @@ button.addEventListener('click',async()=>{
       velocity.set(0,0,0);desktopCamera();
       panel.hidden=false;
       button.disabled=!xrReady;
-      status.textContent='Select Enter VR in your headset. Hold the left stick in to boost, hold B for spiral eyes, and tap or hold right trigger to fire.';
+      status.textContent='Select Enter VR in your headset. Left trigger uses your special weapon; right trigger fires lasers.';
     },{once:true});
     renderer.xr.setFramebufferScaleFactor(.91);
     await renderer.xr.setSession(session);
@@ -69272,6 +69342,7 @@ function prepareAnimalContacts(){
   pawToWorld.multiplyMatrices(craftContactMatrix,cat.matrix);
   worldToPaw.copy(pawToWorld).invert();
   animalSolids.length=0;
+  for(const h of haunchSprings)h.pressure=0;
   if(bazaar.visible && toadPhase!=='away'){
     bazaar.updateMatrixWorld(true);
     for(const part of frogTouchParts){
@@ -69300,6 +69371,14 @@ function avoidAnimalPenetration(point,limb){
     animalTestLocal.copy(animalTestWorld).sub(solid.center)
       .applyQuaternion(solid.inverse).divide(solid.radii);
     const distance=animalTestLocal.length();
+    // Report proximity at the surface, not only after the hand has already
+    // penetrated it. This also catches slow, resting touches in VR.
+    if(solid.kind==='frog' && distance<1.075){
+      limb.touchedFrog=true;
+      limb.frogPressure=Math.max(limb.frogPressure||0,
+        T.MathUtils.clamp((1.075-distance)*5.4,0,1));
+      if(solid.spring)limb.touchedHaunch=solid.spring;
+    }
     if(distance>=1)continue;
     if(distance<.00001)animalTestLocal.set(Math.sign(limb.shoulder.x)||1,.03,.25);
     animalPushWorld.copy(animalTestLocal.normalize()).multiply(solid.radii)
@@ -69307,11 +69386,7 @@ function avoidAnimalPenetration(point,limb){
     // Reserve a tiny skin clearance to avoid flicker at grazing angles.
     animalTestWorld.copy(animalPushWorld);
     collided=true;
-    if(solid.kind==='frog'){
-      // All skin and limbs can be touched, not just the haunches.
-      limb.touchedFrog=true;
-      if(solid.spring)limb.touchedHaunch=solid.spring;
-    }else if(solid.kind==='mouse')limb.touchedMouse=solid.actor;
+    if(solid.kind==='mouse')limb.touchedMouse=solid.actor;
   }
   if(collided)point.copy(animalTestWorld).applyMatrix4(worldToPaw);
   return collided;
@@ -69328,28 +69403,38 @@ function finishAnimalContact(limb,goal,dt){
   if(!limb.previousAnimalTarget)limb.previousAnimalTarget=new T.Vector3();
   limb.previousAnimalTarget.copy(animalTargetWorld);
   limb.impactCooldown=Math.max(0,(limb.impactCooldown||0)-dt);
-  const h=limb.touchedHaunch;
   const touchingFrog=!!limb.touchedFrog;
-  // Brief contact jitter doesn't count as a fresh touch. Once the hand has
-  // been off the toad for 0.2s, touching again gets a new reaction.
+  // A touch anywhere on the toad activates the nearest rear spring. Touching
+  // a haunch directly has the strongest effect; sustained contact also
+  // depresses the spring instead of requiring a high-speed smack.
+  const h=limb.touchedHaunch || (touchingFrog?
+    haunchSprings[animalTargetWorld.x<dreamToad.getWorldPosition(contactCenter).x?0:1]:null);
+  const pressure=limb.frogPressure||0;
+  if(touchingFrog){
+    if(h)h.pressure=Math.max(h.pressure,pressure);
+    if(!limb.touchedHaunch){
+      for(const other of haunchSprings)other.pressure=Math.max(other.pressure,pressure*.38);
+    }
+  }
   const gap=limb.frogTouchGap??1;
-  const freshTouch=touchingFrog && gap>.20;
+  const freshTouch=touchingFrog && gap>.12;
   limb.frogTouchGap=touchingFrog?0:Math.min(1,gap+dt);
-  const smack=!!h && speed>1.25 && limb.impactCooldown<=0;
+  const smack=touchingFrog && speed>.85 && limb.impactCooldown<=0;
   if(touchingFrog && (freshTouch || smack)){
-    const impulse=smack?Math.min(3.7,.40+speed*.95):.29;
+    const impulse=smack?Math.min(6.2,1.25+speed*.95):1.65;
     if(h){
-      h.speed+=impulse;
-      for(const other of haunchSprings)if(other!==h)other.speed-=impulse*.18;
-    }else{
-      // Gentle contact on the head, belly or feet still gets a small squirm.
-      for(const other of haunchSprings)other.speed+=.12;
+      h.speed+=impulse*.60;
+      h.swaySpeed+=Math.sign(h.rest.x)*impulse*.52;
+      h.squishSpeed+=impulse*.68;
+      for(const other of haunchSprings)if(other!==h){
+        other.speed+=impulse*.13;other.swaySpeed-=Math.sign(other.rest.x)*impulse*.13;
+      }
     }
     if(toadPhase==='shopping' || toadPhase==='arriving'){
       toadGlareRemaining=Math.max(toadGlareRemaining,smack?5.7:4.8);
       toadReactionStrength=Math.max(toadReactionStrength,smack?1:.65);
     }
-    limb.impactCooldown=smack?.14:.25;
+    limb.impactCooldown=smack?.12:.22;
   }
   const mouse=limb.touchedMouse;
   if(mouse && speed>.2 && mouse!==limb.previousContactMouse){
@@ -69407,7 +69492,7 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
   prepareAnimalContacts();
   const blend=1-Math.exp(-23*dt);
   for(const limb of paws){
-    limb.touchedFrog=false;limb.touchedHaunch=null;limb.touchedMouse=null;
+    limb.touchedFrog=false;limb.touchedHaunch=null;limb.touchedMouse=null;limb.frogPressure=0;
     const side=Math.sign(limb.shoulder.x);
     const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):vrShoulder.copy(limb.shoulder);
     followSpine(shoulder);
@@ -69432,7 +69517,7 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       handTarget.set(position.x-viewer.x,position.y-viewer.y,position.z-viewer.z)
         .applyQuaternion(trackingToCat).multiplyScalar(.73).add(eyeAnchor);
 
-      handTarget.sub(shoulder).clampLength(0,.62).add(shoulder);
+      handTarget.sub(shoulder).clampLength(0,bazaar.visible?.82:.62).add(shoulder);
       handTarget.y=Math.max(.065,handTarget.y);
       // A low wrist close to the seated pelvis settles onto the idle paw perch.
       // Measure from the seat so nodding or leaning does not lift a resting paw.
@@ -69710,13 +69795,15 @@ renderer.setAnimationLoop((ms,frame)=>{
   if(!rawFire)blockFire=false;
   const fireDown=rawFire&&!blockFire;
   const yDown=frame?!!inputs.find(i=>i.handedness==='left')?.gamepad?.buttons[5]?.pressed:moveKeys.has('KeyY');
+  const specialDown=frame?triggerHeld('left'):moveKeys.has('KeyY');
   const summon=frame?!!inputs.find(i=>i.handedness==='left')?.gamepad?.buttons[4]?.pressed:moveKeys.has('KeyT');
   hideArcs();
-  if(introBoss){desktopSummon=false;tickIntro(dt);}
+  if(startFreeze>0 && !bazaar.visible)tickStartCountdown(dt);
+  if(introBoss){desktopSummon=false;introHead=viewer?new T.Vector3(viewer.x,viewer.y,viewer.z):null;tickIntro(dt);}
   else if(finished){desktopSummon=false;deathInput(!!frame,yDown,rawFire);}
   else if(!shopInput(summon,yDown,fireDown,!!frame,t,dt)){
-    updateShock(loadout.special==='Shockwave' && yDown,dt);
-    if(loadout.special==='Arc field')useArc(yDown,dt,t);
+    updateShock(loadout.special==='Shockwave' && specialDown,dt);
+    if(loadout.special==='Arc field')useArc(specialDown,dt,t);
     updateWave(dt,t,fireDown);
     updateLasers(!finished && fireDown,dt);
     gatherKarma(dt,t);tickSpeech(dt);
