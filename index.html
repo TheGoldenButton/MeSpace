@@ -40,7 +40,6 @@ button:hover:not(:disabled),summary:hover{border-color:#a1f4df;background:#35455
 <tr><td>Spiral eyes</td><td>Hold H</td><td>Hold B</td></tr></tbody></table>
 <p>Shoot the START sign to begin.</p></article></details>
 <button id="enter" disabled>Enter VR</button>
-<button id="summon-toad" type="button">Dream Toad (T)</button>
 <button id="mic" type="button" disabled>Enable mic</button>
 <small id="mic-status" role="status">Enable the mic before entering VR to animate the cat’s mouth.</small>
 <small id="status" role="status">If you’re viewing a file preview, open the hosted HTTPS page directly in your browser to start the 3D scene.</small>
@@ -66521,6 +66520,10 @@ function ring(parent,mat,r,y,thickness) {
 }
 const avatar = new T.Group();
 avatar.name='Conscious Kitty and UFO';
+// Model-space position of the center between the pilot's eyes when facing forward.
+// Anchor the saucer to the pilot's point of view, not to its geometric center.
+const pilotEyeRest = new T.Vector3(0,.30+.584+.211,-.096-.272);
+const pilotEyeWorld = new T.Vector3();
 const ufo = new T.Group();ufo.name='UFO';avatar.add(ufo);
 lathe(ufo,chrome,[[0,-.16],[.21,-.22],[.38,-.18],[.59,-.10],[.74,-.022],[.76,.025],[.72,.08],[.58,.15],[.37,.20],[0,.21]]);
 lathe(ufo,darkMetal,[[0,-.105],[.35,-.105],[.49,-.14],[.41,-.20],[.28,-.25],[0,-.254]]);
@@ -67343,6 +67346,9 @@ function useMirrorMaterial(part){
   const source=part.material;
   if(!mirrorMaterials.has(source)){
     const copy=source.clone();
+    // The physical-side shader hides objects behind the mirror aperture.
+    // Applying that shader to their *mirror images* hides the mice/toad too.
+    if(source.onBeforeCompile===occludeBehindMirror)copy.onBeforeCompile=()=>{};
     Object.assign(copy,{stencilWrite:true,stencilRef:1,stencilFunc:T.EqualStencilFunc,
       stencilWriteMask:0,clippingPlanes:[virtualSide]});
     mirrorMaterials.set(source,copy);
@@ -67748,10 +67754,37 @@ const shopCanvas=document.createElement('canvas');shopCanvas.width=800;shopCanva
 const shopMap=new T.CanvasTexture(shopCanvas);shopMap.colorSpace=T.SRGBColorSpace;
 const shopMat=new T.MeshBasicMaterial({map:shopMap,toneMapped:false,transparent:true,depthTest:true,depthWrite:false});
 const sign=mesh(bazaar,new T.PlaneGeometry(.77,.655),shopMat,.24,.035,-1.52);sign.renderOrder=96;
+// The shop bubble is a physical two-sided object: its reverse is an opaque,
+// text-free back panel with the same cutout as the live text on its front.
+// Parenting it to the sign ensures the mirrored bazaar includes the back too.
+const shopBackCanvas=document.createElement('canvas');
+shopBackCanvas.width=shopCanvas.width;shopBackCanvas.height=shopCanvas.height;
+const shopBackInk=shopBackCanvas.getContext('2d');
+const shopBackMap=new T.CanvasTexture(shopBackCanvas);shopBackMap.colorSpace=T.SRGBColorSpace;
+const shopBackMat=new T.MeshBasicMaterial({map:shopBackMap,toneMapped:false,
+  transparent:true,depthTest:true,depthWrite:false,side:T.DoubleSide});
+const signBack=mesh(sign,new T.PlaneGeometry(.77,.655),shopBackMat,0,0,-.012);
+signBack.name='Dream Toad shop panel reverse';signBack.renderOrder=95;
+function paintShopBack(){
+  // Copy only the silhouette/alpha, never the words or buttons from the face.
+  const c=shopBackInk,w=shopBackCanvas.width,h=shopBackCanvas.height;
+  c.clearRect(0,0,w,h);c.drawImage(shopCanvas,0,0);
+  c.globalCompositeOperation='source-in';c.fillStyle='#433853';c.fillRect(0,0,w,h);
+  c.globalCompositeOperation='source-over';
+  const top=wave?12:213,bottomEdge=wave?654:432;
+  c.strokeStyle='#b5a4c3';c.lineWidth=6;
+  c.beginPath();c.roundRect(66,top+12,711,bottomEdge-top-24,34);c.stroke();
+  c.strokeStyle='#736586';c.lineWidth=2;
+  for(const x of [115,723])for(const y of [top+48,bottomEdge-47]){
+    c.beginPath();c.arc(x,y,10,0,Math.PI*2);c.stroke();
+  }
+  shopBackMap.needsUpdate=true;
+}
 let selection=0,wasShop=false,wasNext=false,wasBuy=false,shopNotice='',shopVR=false;
-const summonControl=document.querySelector('#summon-toad');
 let desktopSummon=false,toadPhase='away',phaseTime=0,toadHeight=0,toadSpeed=0;
-summonControl.addEventListener('click',()=>{desktopSummon=true;});
+// Any rear-haunch slap starts a short angry turn toward the actual viewer.
+// Keep the angle in state so it turns smoothly rather than snapping 180 degrees.
+let toadGlareRemaining=0,toadGlareIntensity=0,toadFacingYaw=.19;
 const haunchSprings=dreamToad.children.filter(p=>p.name==='Grand haunch').map(p=>({
   p,rest:p.position.clone(),scale:p.scale.clone(),offset:0,speed:0
 }));
@@ -67827,7 +67860,12 @@ const toadEyes=[-1,1].map(side=>{
     ['Golden iris','Horizontal pupil','Catchlight'].includes(p.name));
   for(const part of details){part.position.sub(pivot.position);pivot.add(part);}
   pivot.rotation.order='YXZ';
-  return {pivot,details:details.map(p=>({p,y:p.position.y,sy:p.scale.y}))};
+  // Raise and tilt both brows inward during the glare; because these belong
+  // to the eye pivots, they follow his gaze and reflect along with his face.
+  const brow=oval(pivot,dreamToad.getObjectByName('Ear gland').material,
+    0,.167,.16,.173,.042,.053);
+  brow.name='Angry eyebrow';
+  return {pivot,side,brow,details:details.map(p=>({p,y:p.position.y,sy:p.scale.y}))};
 });
 const visitPoint=new T.Vector3(),visitSideways=new T.Vector3();
 let nearMirrorVisit=false,visitSide=1,slideSign=1;
@@ -67844,6 +67882,22 @@ function keepVisitorClear(point){
 }
 const forefeet=dreamToad.children.filter(p=>['Forearm','Front palm','Forefinger','Toe pad'].includes(p.name))
   .map(p=>({p,side:Math.sign(p.position.x),y:p.position.y,z:p.position.z}));
+// Reflect the full visitor, including its dynamically moving haunches, eyes,
+// and smoke. The mirror hierarchy shares each live node's local transform
+// matrix; no delayed clone/rebuild or second animation simulation is needed.
+const mirroredBazaar=mirrorSceneObject(bazaar);
+const mirrorVisitorNodes=[];
+function linkMirroredVisitor(live,image){
+  image.matrixAutoUpdate=false;
+  image.matrix=live.matrix;
+  mirrorVisitorNodes.push({live,image});
+  for(let i=0;i<live.children.length;i++)linkMirroredVisitor(live.children[i],image.children[i]);
+}
+linkMirroredVisitor(bazaar,mirroredBazaar);
+const frogTouchParts=dreamToad.children.filter(p=>p.isMesh &&
+  ['Pear-shaped body','Wide head','Lower lip','Cream throat','Grand haunch',
+    'Folded hind thigh','Hind ankle','Forearm','Front palm','Eye turret'].includes(p.name));
+const haunchByPart=new Map(haunchSprings.map(h=>[h.p,h]));
 function anchorVisitor(){
   camera.getWorldPosition(bazaar.position);camera.getWorldDirection(visitForward);
   if(visitForward.x**2+visitForward.z**2>.0001)
@@ -67882,23 +67936,52 @@ function animateVisitor(dt,t){
   if(leaving)dreamToad.position.set(leaveFrom.x-2.1*depart-.38*Math.sin(Math.PI*depart),height,leaveFrom.z-5.3*depart);
   else dreamToad.position.set(-.36-2.5*approach+.32*driftBeat*Math.sin(2*Math.PI*u)+.009*Math.sin(t*.71),height,-1.55-5.4*approach);
   keepVisitorClear(dreamToad.position);
-  dreamToad.rotation.set(.014*breath+.09*stroke,
-    leaving?leaveYaw-2.76*ease(u,0,.47):.19+.15*approach,
+  if(leaving){toadGlareRemaining=0;}
+  else toadGlareRemaining=Math.max(0,toadGlareRemaining-dt);
+  const angry=!leaving && toadGlareRemaining>0;
+  toadGlareIntensity+=(Number(angry)-toadGlareIntensity)*
+    (1-Math.exp(-(angry?6:2.7)*dt));
+  const neutralYaw=.19+.15*approach;
+  let desiredYaw=leaving?leaveYaw-2.76*ease(u,0,.47):neutralYaw;
+  if(angry){
+    // Model faces local +Z. Convert the headset/camera into the bazaar's
+    // coordinates so turning toward the viewer also works when the bazaar
+    // itself is rotated or positioned beside the mirror.
+    bazaar.updateWorldMatrix(true,false);
+    camera.getWorldPosition(viewerPoint);bazaar.worldToLocal(viewerPoint);
+    const dx=viewerPoint.x-dreamToad.position.x;
+    const dz=viewerPoint.z-dreamToad.position.z;
+    if(dx*dx+dz*dz>.0025)desiredYaw=Math.atan2(dx,dz);
+  }
+  if(leaving)toadFacingYaw=desiredYaw;
+  else{
+    let delta=Math.atan2(Math.sin(desiredYaw-toadFacingYaw),Math.cos(desiredYaw-toadFacingYaw));
+    if(Math.abs(Math.abs(delta)-Math.PI)<.0001)delta=Math.PI;
+    toadFacingYaw+=delta*(1-Math.exp(-(angry?5.6:2.9)*dt));
+  }
+  dreamToad.rotation.set(.014*breath+.09*stroke+.06*toadGlareIntensity,
+    toadFacingYaw,
     .012*Math.sin(t*1.27)+.085*driftBeat*Math.cos(2*Math.PI*u)+(leaving?.135*Math.sin(Math.PI*ease(u,0,.57)):0));
-  throat.scale.copy(throatRest);throat.scale.y*=1+.039*breath;throat.scale.z*=1+.065*breath;
+  throat.scale.copy(throatRest);throat.scale.y*=1+.039*breath-.075*toadGlareIntensity;
+  throat.scale.z*=1+.065*breath;
   blinkClock-=dt;blinkAge+=dt;
   if(blinkClock<=0){blinkAge=0;blinkClock=2.3+Math.random()*3.7;}
   const blink=blinkAge<.21?Math.sin(Math.PI*blinkAge/.21)**2:0;
   camera.getWorldPosition(viewerPoint);
   dreamToad.worldToLocal(viewerPoint);
   const follow=1-Math.exp(-9*dt);
-  for(const {pivot,details} of toadEyes){
+  for(const {pivot,side,brow,details} of toadEyes){
     eyeAim.subVectors(viewerPoint,pivot.position);
     const yaw=T.MathUtils.clamp(Math.atan2(eyeAim.x,Math.max(.01,eyeAim.z)),-.62,.62);
     const pitch=T.MathUtils.clamp(-Math.atan2(eyeAim.y,Math.hypot(eyeAim.x,eyeAim.z)),-.38,.38);
     pivot.rotation.y+=(yaw-pivot.rotation.y)*follow;
     pivot.rotation.x+=(pitch-pivot.rotation.x)*follow;
-    for(const {p,y,sy} of details){p.scale.y=sy*(1-.96*blink);p.position.y=y*(1-blink);}
+    brow.rotation.z=side*(.05+.48*toadGlareIntensity);
+    brow.position.y=.167-.080*toadGlareIntensity;
+    for(const {p,y,sy} of details){
+      p.scale.y=sy*(1-.96*blink)*(1-.42*toadGlareIntensity);
+      p.position.y=y*(1-blink);
+    }
   }
   for(const {p,side,y,z} of forefeet){
     const step=leaving?Math.sin(phaseTime*5.3)*side*ease(u,0,.17):0;
@@ -67906,12 +67989,21 @@ function animateVisitor(dt,t){
   }
   sign.visible=!leaving && (!arriving||u>.7);
   shopMat.opacity=arriving?ease(u,.7,.96):1;
+  shopBackMat.opacity=shopMat.opacity;
   for(const h of haunchSprings){
     // Takeoff and alternate paddle strokes load each haunch slightly differently.
     const drive=leaving?.065*Math.sin(Math.PI*u)*Math.sin(phaseTime*6.1+Math.sign(h.rest.x)*.35):0;
     h.speed-=kick*.94;
-    h.speed+=(86*(drive-h.offset)-6.8*h.speed)*dt;
-    h.offset=T.MathUtils.clamp(h.offset+h.speed*dt,-.095,.095);
+    // Continuous damped spring: every hand slap adds velocity that remains
+    // active after contact and settles naturally instead of resetting each frame.
+    const springSteps=Math.max(1,Math.ceil(dt/.010));
+    for(let j=0;j<springSteps;j++){
+      const hdt=dt/springSteps;
+      h.speed+=(86*(drive-h.offset)-6.8*h.speed)*hdt;
+      h.offset+=h.speed*hdt;
+      if(h.offset>.14){h.offset=.14;h.speed=Math.min(0,h.speed)*.42;}
+      if(h.offset<-.14){h.offset=-.14;h.speed=Math.max(0,h.speed)*.42;}
+    }
     h.p.position.z=h.rest.z-.46*h.offset;h.p.position.y=h.rest.y+h.offset;h.p.scale.y=h.scale.y*(1+h.offset*.7);
     h.p.scale.z=h.scale.z*(1-h.offset*.42);
     for(const bead of h.pearls){
@@ -67980,7 +68072,7 @@ function paintShop(){
     c.fillStyle='#fff2df';c.font='bold 39px system-ui';
     c.fillText('Start a game so I can help you!',83,top+126);
     c.font='21px system-ui';c.fillStyle='#b9adbf';c.fillText(closeHint,83,bottomEdge-29);
-    shopMap.needsUpdate=true;return;
+    shopMap.needsUpdate=true;paintShopBack();return;
   }
   c.font='28px system-ui';c.fillText(loadout.karma+' karma',565,66);
   c.fillStyle='#dfcfe8';c.font='24px system-ui';c.fillText('Primary: Laser     Special: '+loadout.special,83,115);
@@ -67992,7 +68084,7 @@ function paintShop(){
   c.font='24px system-ui';c.fillStyle='#e9ddb0';c.fillText(shopNotice||'Fly near glowing orbs to collect karma.',83,532);
   c.fillStyle='#d9c9e6';c.fillText(shopVR?'Y: next     Right trigger: choose':'Y: next     F: choose',83,601);
   c.textAlign='right';c.font='21px system-ui';c.fillStyle='#b9adbf';c.fillText(closeHint,747,601);c.textAlign='left';
-  shopMap.needsUpdate=true;
+  shopMap.needsUpdate=true;paintShopBack();
 }
 function buyOffer(){
   const o=offers()[selection];
@@ -68014,6 +68106,7 @@ function shopInput(toggle,next,buy,vr,t,dt){
   if(toggled && toadPhase!=='leaving'){
     if(toadPhase==='away'){
       anchorVisitor();toadPhase='arriving';phaseTime=0;toadHeight=.59;toadSpeed=0;
+      toadGlareRemaining=toadGlareIntensity=0;toadFacingYaw=.19;
       bazaar.visible=sign.visible=true;hud.visible=warning.visible=false;
       stopFire();meter.visible=false;for(const pod of pods)stopHum(pod);
       summonChime();shopNotice='';selection=0;paintShop();
@@ -68097,6 +68190,9 @@ const speeches=new Map();
 let chatterWait=3;
 function silenceSpeaker(actor){
   const item=speeches.get(actor);if(!item)return;
+  item.reflection.removeFromParent();
+  item.reflection.material.dispose();
+  mirrorMaterials.delete(item.sprite.material); // Dynamic bubble materials must not leak.
   item.sprite.removeFromParent();item.sprite.material.map.dispose();item.sprite.material.dispose();speeches.delete(actor);
 }
 function say(actor,line,life=2.6){
@@ -68113,7 +68209,11 @@ function say(actor,line,life=2.6){
   const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;
   const mat=new T.SpriteMaterial({map,transparent:true,depthWrite:false,toneMapped:false});
   mat.onBeforeCompile=occludeBehindMirror;
-  const sprite=new T.Sprite(mat);scene.add(sprite);speeches.set(actor,{sprite,life,w,h});
+  const sprite=new T.Sprite(mat);scene.add(sprite);
+  // Speech is spawned dynamically (outside the pod model), so give every
+  // mouse bubble its own stencil-clipped reflected sprite too.
+  const reflection=mirrorSceneObject(sprite);
+  speeches.set(actor,{sprite,reflection,life,w,h});
 }
 function tickSpeech(dt){
   chatterWait-=dt;
@@ -68124,6 +68224,11 @@ function tickSpeech(dt){
     const dist=sprite.position.distanceTo(introBoss?shotCamera.position:skyCenter);
     const k=T.MathUtils.clamp(dist*.00058,.0033,.012);
     sprite.scale.set(item.w*k,item.h*k,1);sprite.material.opacity=Math.min(1,item.life*5);
+    // mirrorSceneObject links the matrices. Update it before the reflected
+    // hierarchy renders, then match the bubble's fading and visibility.
+    sprite.updateMatrix();
+    item.reflection.visible=sprite.visible;
+    item.reflection.material.opacity=sprite.material.opacity;
   }
 }
 const openingLine='The Conscious Kitty is evil, destroy it now!';
@@ -69122,6 +69227,100 @@ pawSolid(0,.132,0,.50,.46,.435,head);
 pawSolid(0,.037,-.285,.33,.214,.239,head);
 pawSolid(0,-.018,-.09,.24,.202,.238,jaw);
 const contactLocal=new T.Vector3(),contactGoal=new T.Vector3();
+// The seated cat is mirrored for rendering, but tracked hands need to collide
+// against the *physical* toad and mice on the player's side of the glass.
+const pawToWorld=new T.Matrix4(),worldToPaw=new T.Matrix4(),craftContactMatrix=new T.Matrix4();
+const contactCraftQ=new T.Quaternion(),contactUnitScale=new T.Vector3(1,1,1);
+const animalSolids=[];
+const contactScale=new T.Vector3(),contactCenter=new T.Vector3();
+const contactRotation=new T.Quaternion(),contactInverseRotation=new T.Quaternion();
+const animalTestWorld=new T.Vector3(),animalTestLocal=new T.Vector3();
+const animalPushWorld=new T.Vector3(),animalTargetWorld=new T.Vector3();
+const animalClearance=.060; // Approximate the radius of the projected VR paw.
+function addAnimalSolid(center,rotation,radii,kind,actor,spring=null){
+  animalSolids.push({center:center.clone(),rotation:rotation.clone(),
+    inverse:rotation.clone().invert(),radii:radii.clone().addScalar(animalClearance),
+    kind,actor,spring});
+}
+function prepareAnimalContacts(){
+  contactCraftQ.copy(avatar.quaternion).multiply(ufo.quaternion);
+  craftContactMatrix.compose(avatar.position,contactCraftQ,contactUnitScale);
+  cat.updateMatrix();
+  pawToWorld.multiplyMatrices(craftContactMatrix,cat.matrix);
+  worldToPaw.copy(pawToWorld).invert();
+  animalSolids.length=0;
+  if(bazaar.visible && toadPhase!=='away'){
+    bazaar.updateMatrixWorld(true);
+    for(const part of frogTouchParts){
+      part.getWorldPosition(contactCenter);
+      part.getWorldQuaternion(contactRotation);
+      part.getWorldScale(contactScale);
+      // Named frog skin/body pieces are ellipsoidal unit-sphere meshes.
+      addAnimalSolid(contactCenter,contactRotation,contactScale,'frog',dreamToad,haunchByPart.get(part));
+    }
+  }
+  for(const pod of pods){
+    if(pod.position.distanceToSquared(avatar.position)>16)continue;
+    pod.updateMatrixWorld(true);
+    pod.getWorldQuaternion(contactRotation);pod.getWorldScale(contactScale);
+    const body=pod.localToWorld(contactCenter.set(0,-.12,0));
+    addAnimalSolid(body,contactRotation,new T.Vector3(.58,.30,.71).multiply(contactScale),'mouse',pod);
+    const pilot=pod.localToWorld(contactCenter.set(0,.17,.12));
+    addAnimalSolid(pilot,contactRotation,new T.Vector3(.32,.35,.33).multiply(contactScale),'mouse',pod);
+  }
+}
+function avoidAnimalPenetration(point,limb){
+  if(!limb.tracked || !animalSolids.length)return false;
+  animalTestWorld.copy(point).applyMatrix4(pawToWorld);
+  let collided=false;
+  for(const solid of animalSolids){
+    animalTestLocal.copy(animalTestWorld).sub(solid.center)
+      .applyQuaternion(solid.inverse).divide(solid.radii);
+    const distance=animalTestLocal.length();
+    if(distance>=1)continue;
+    if(distance<.00001)animalTestLocal.set(Math.sign(limb.shoulder.x)||1,.03,.25);
+    animalPushWorld.copy(animalTestLocal.normalize()).multiply(solid.radii)
+      .applyQuaternion(solid.rotation).add(solid.center);
+    // Reserve a tiny skin clearance to avoid flicker at grazing angles.
+    animalTestWorld.copy(animalPushWorld);
+    collided=true;
+    if(solid.spring)limb.touchedHaunch=solid.spring;
+    else if(solid.kind==='mouse')limb.touchedMouse=solid.actor;
+  }
+  if(collided)point.copy(animalTestWorld).applyMatrix4(worldToPaw);
+  return collided;
+}
+function finishAnimalContact(limb,goal,dt){
+  if(!limb.tracked){limb.previousContactHaunch=null;limb.previousContactMouse=null;return;}
+  animalTargetWorld.copy(goal).applyMatrix4(pawToWorld);
+  const speed=limb.previousAnimalTarget && dt>.0001?
+    animalTargetWorld.distanceTo(limb.previousAnimalTarget)/dt:0;
+  if(!limb.previousAnimalTarget)limb.previousAnimalTarget=new T.Vector3();
+  limb.previousAnimalTarget.copy(animalTargetWorld);
+  limb.impactCooldown=Math.max(0,(limb.impactCooldown||0)-dt);
+  const h=limb.touchedHaunch;
+  if(h && speed>.10 && (h!==limb.previousContactHaunch ||
+      (speed>1.25 && limb.impactCooldown<=0))){
+    const impulse=Math.min(3.7,.40+speed*.95);
+    h.speed+=impulse;
+    // A real hand-to-haunch impact (not the passive bob) triggers his
+    // annoyed turn and keeps him glaring for several seconds.
+    if(toadPhase==='shopping' || toadPhase==='arriving')
+      toadGlareRemaining=4.8;
+    // A little opposite-haunch wobble lets a slap ripple through the frog.
+    for(const other of haunchSprings)if(other!==h)other.speed-=impulse*.18;
+    limb.impactCooldown=.11;
+  }
+  const mouse=limb.touchedMouse;
+  if(mouse && speed>.2 && mouse!==limb.previousContactMouse){
+    const shove=mouse.position.clone().sub(animalTargetWorld);
+    if(shove.lengthSq()<.0001)shove.set(0,0,-1);
+    mouse.userData.recoil=shove.normalize();
+    mouse.userData.recoilTime=Math.max(mouse.userData.recoilTime||0,.23);
+  }
+  limb.previousContactHaunch=h||null;
+  limb.previousContactMouse=mouse||null;
+}
 function updatePawSolids(){
   for(const solid of pawSolids){
     const {center,offset,parent,rotation,inverse}=solid;
@@ -69137,7 +69336,7 @@ function updatePawSolids(){
     inverse.copy(rotation).invert();
   }
 }
-function slidePaw(point,target,blend,side){
+function slidePaw(point,target,blend,side,limb){
   contactGoal.copy(point).lerp(target,blend);
   const steps=Math.max(1,Math.ceil(point.distanceTo(contactGoal)/.025));
   for(let i=steps;i>0;i--){
@@ -69152,6 +69351,7 @@ function slidePaw(point,target,blend,side){
         point.copy(contactLocal.normalize()).multiply(radii).applyQuaternion(rotation).add(center);
         clear=false;
       }
+      if(avoidAnimalPenetration(point,limb))clear=false;
       if(clear)break;
     }
   }
@@ -69163,8 +69363,10 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
   catToTracking.copy(trackingToCat).invert();
   eyeAnchor.set(0,eyeHeight,-.272).applyQuaternion(head.quaternion).add(head.position);
   updatePawSolids();
+  prepareAnimalContacts();
   const blend=1-Math.exp(-23*dt);
   for(const limb of paws){
+    limb.touchedHaunch=null;limb.touchedMouse=null;
     const side=Math.sign(limb.shoulder.x);
     const shoulder=frame?vrShoulder.set(side*.223,.329,-.244):vrShoulder.copy(limb.shoulder);
     followSpine(shoulder);
@@ -69176,6 +69378,7 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       const grip=input.gripSpace??(input.targetRayMode==='tracked-pointer'?input.targetRaySpace:null);
       if(!tracked && grip)tracked=frame.getPose(grip,reference);
     }
+    if(!tracked){limb.previousAnimalTarget=null;limb.impactCooldown=0;}
     limb.tracked=!!tracked;
     limb.livePaw.visible=limb.tracked;
     handTarget.copy(limb.rest);
@@ -69210,7 +69413,8 @@ function posePaws(frame,reference,inputs,viewer,dt,t){
       wrist.setFromAxisAngle(up,side*.18*lift);
     }
     const smoothing=blend;
-    slidePaw(limb.paw.position,handTarget,smoothing,side);
+    slidePaw(limb.paw.position,handTarget,smoothing,side,limb);
+    finishAnimalContact(limb,handTarget,dt);
     const elbow=armElbow.copy(shoulder).lerp(limb.paw.position,.48);
     const reach=armDirection.copy(limb.paw.position).sub(shoulder).length();
     const fold=T.MathUtils.clamp(1-reach/(frame?.62:.55),.06,1);
@@ -69346,7 +69550,10 @@ renderer.setAnimationLoop((ms,frame)=>{
       pitch=view.x;
       roll=view.z;
     }else{
-      x=avatar.position.x;z=avatar.position.z;
+      // Reconstruct the eye's position if WebXR misses a viewer pose. The hull
+      // origin is offset from the eyes, so reusing its center would cause drift.
+      x=avatar.position.x+pilotEyeWorld.x+leanWorld.x;
+      z=avatar.position.z+pilotEyeWorld.z+leanWorld.z;
     }
   }else {
     const pressed=(a,b)=>Number(moveKeys.has(a)||moveKeys.has(b));
@@ -69359,15 +69566,26 @@ renderer.setAnimationLoop((ms,frame)=>{
     desktopCamera();
     x=desktopPosition.x;z=desktopPosition.z;
     avatarHeight=desktopPosition.y;
+    // Mouse look turns the cat's head, not the entire UFO.
+    pitch=desktopPitch;
   }
-  avatar.position.set(x,avatarHeight-1.10,z);
   reflected.visible=z>mirrorZ;
   if(!viewer)leanWorld.set(0,0,0);
-  avatar.position.sub(leanWorld);
   const delta=T.MathUtils.euclideanModulo(yaw-avatar.rotation.y+Math.PI,2*Math.PI)-Math.PI;
   const neckYaw=T.MathUtils.clamp(delta,-1.05,1.05)*Math.exp(-2.3*dt);
   avatar.rotation.y=yaw-neckYaw;
-  ufo.rotation.x=frame?shipPitch:desktopPitch;
+  // In VR the right-stick tilt remains a ship maneuver. Looking down with the
+  // mouse is only a head/camera movement, so the deck stays beneath the cat.
+  ufo.rotation.x=frame?shipPitch:0;
+  // The tracked/desktop camera represents the eyes, which sit ahead of the
+  // saucer's center. Use the same eye-to-hull offset in VR and desktop.
+  pilotEyeWorld.copy(pilotEyeRest).applyQuaternion(ufo.quaternion)
+    .applyQuaternion(avatar.quaternion);
+  avatar.position.set(x,avatarHeight,z).sub(pilotEyeWorld).sub(leanWorld);
+  // Pitch the gun mounts to follow desktop aim without pitching the whole hull.
+  // This also keeps the mirrored and visible copies of the weapons in sync.
+  emitters.rotation.x=frame?0:desktopPitch;
+  liveEmitters.rotation.x=emitters.rotation.x;
   localLoad.copy(flightLoad).applyAxisAngle(up,-avatar.rotation.y);
   seatedLean.lerp(localLoad,1-Math.exp(-(8+5*boostSpeed)*dt));
   const breath=Math.sin(t*1.68+.22*Math.sin(t*.4));
@@ -69486,6 +69704,18 @@ renderer.setAnimationLoop((ms,frame)=>{
   updateSun();
   sun.updateMatrix();pinStars.updateMatrix();
   for(const pod of pods)pod.updateMatrix();
+  if(bazaar.visible)bazaar.updateMatrixWorld(true);
+  for(const {live,image} of mirrorVisitorNodes)image.visible=live.visible;
+  // The toad's fade, the steam and its particles must match their reflections.
+  for(const {live,image} of mirrorVisitorNodes){
+    if(!live.material || !image.material)continue;
+    const from=live.material,to=image.material;
+    if(to.transparent!==from.transparent || to.depthWrite!==from.depthWrite){
+      to.transparent=from.transparent;to.depthWrite=from.depthWrite;to.needsUpdate=true;
+    }
+    to.opacity=from.opacity;
+    if(from.isSpriteMaterial)to.rotation=from.rotation;
+  }
   try { if(introBoss)renderOpening();else renderer.render(scene,camera); }
   catch(error){
     renderer.setAnimationLoop(null);
